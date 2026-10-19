@@ -1,0 +1,14 @@
+services:
+  db:
+    container_name: IGLESIA_CONTAINER
+    restart: always # Reiniciar el contenedor si se detiene
+    image: mongo:6.0
+    volumes:
+      - ./mongo:/data/db
+    ports:
+      - ${PORT_DB}:${PORT_DB}
+    environment:
+      MONGODB_DATABASE: ${MONGODB_DATABASE}
+volumes:
+  iglesia-db-volumen:
+    external: true

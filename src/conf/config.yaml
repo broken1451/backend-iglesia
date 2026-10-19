@@ -1,0 +1,21 @@
+port: 3500
+mongo:
+  url: "mongodb://localhost:27017"
+  dbName: "iglesia"
+  collectionName: "users"
+jwt:
+  secret: ""
+  expiresIn: ""
+email:
+  service: ""
+  host: ""
+  port: ""
+  auth:
+    user: ""
+    pass: ""
+  from:
+    name: ""
+    address: ""
+  subject: ""
+google:
+  clientId: ""
