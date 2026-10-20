@@ -1,124 +1,105 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# API Iglesia
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+API REST para la Convención: alimenta el **sitio web público** (directorio de iglesias, calendario de actividades, noticias) y el **panel administrativo** donde cada usuario gestiona lo que su rol le permite.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+Hecha con **NestJS 12**, **MongoDB** (Mongoose) y los módulos oficiales `@nestjs/authentication` y `@nestjs/authorization`.
 
-## Description
+## Documentación
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+| Documento | Qué explica |
+|---|---|
+| [docs/arquitectura.md](docs/arquitectura.md) | Estructura de carpetas, el camino de un request y las decisiones de diseño |
+| [docs/seguridad.md](docs/seguridad.md) | Login, tokens, roles, menú y quién puede hacer qué (y por qué) |
+| [docs/api.md](docs/api.md) | Todos los endpoints con sus campos, permisos y ejemplos |
 
-## Project setup
+## Puesta en marcha
 
-```bash
-$ yarn install
+### Requisitos
+- Node.js 20.19 o superior (se usa 24)
+- Yarn 4 (viene definido en `package.json`)
+- Docker, para MongoDB
+
+### 1. Variables de entorno
+Crea un archivo `.env` en la raíz (no se sube a git):
+
+```env
+STAGE=dev                 # dev: usa la BD de config.yaml | production: usa URI y DBNAME
+JWT_SECRET=...            # mínimo 32 caracteres; firma los tokens
+PORT_DB=27017             # puerto de Mongo para docker-compose
+MONGODB_DATABASE=iglesia
+
+# Solo en producción (STAGE=production):
+# URI=mongodb://usuario:clave@host:27017
+# DBNAME=iglesia
 ```
 
-## Compile and run the project
+Para generar un `JWT_SECRET` seguro:
 
 ```bash
-# development
-$ yarn run start
-
-# watch mode
-$ yarn run start:dev
-
-# production mode
-$ yarn run start:prod
+node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
 ```
 
-## Run tests
+### 2. Base de datos
 
 ```bash
-# unit tests
-$ yarn run test
-
-# e2e tests
-$ yarn run test:e2e
-
-# test coverage
-$ yarn run test:cov
+docker compose up -d
 ```
 
-## Deployment
+Levanta Mongo 6 en el contenedor `IGLESIA_CONTAINER`; los datos quedan en la carpeta `./mongo` (ignorada por git).
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+### 3. Instalar y arrancar
 
 ```bash
-$ yarn install -g @nestjs/mau
-$ mau deploy
+yarn install
 ```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Observability
-
-In production applications, observability is essential for understanding how your system behaves, detecting issues early, and maintaining reliable performance.
-
-[NestJS Observe](https://observe.nestjs.com) automatically instruments your NestJS application, giving you deep visibility into your system with minimal setup:
-
-- **Distributed tracing:** Follow requests across services and understand how they flow through your system.
-- **Waterfall analysis:** Visualize request execution and identify slow operations, bottlenecks, and unexpected delays.
-- **Performance analysis:** Analyze application performance in real time and quickly pinpoint areas that need optimization.
-- **Metrics:** Track key application and infrastructure metrics to understand system health and performance trends.
-- **Logging:** Centralize and correlate logs with traces and other telemetry to make debugging easier.
-- **Error tracking:** Detect errors quickly and investigate their root causes with the surrounding context.
-- **SLA monitoring:** Track service-level objectives and identify when your application is approaching or exceeding defined thresholds.
-- **Alarms and alerts:** Set up alerts for critical errors, performance degradation, SLA violations, and other anomalies so your team can react quickly.
-
-To add it to this project:
 
 ```bash
-$ yarn install @nestjs/observe
+yarn start:dev
 ```
 
-Then follow the [setup guide](https://docs.nestjs.com/observability/overview) - it takes a single import and an app key.
+La API queda en `http://localhost:3500/api` (el puerto se define en `src/conf/config.yaml`).
 
-The free plan needs no payment details and covers 300,000 events a month. You can also browse the [live demo](https://www.observe-demo.nestjs.com/dashboard) first - the whole dashboard over a busy service's data, with nothing to install.
+### 4. Crear el primer administrador
+El registro público siempre crea usuarios con rol `IGLESIA`. Regístrate con `POST /api/auth/register` y luego súbete a ADMIN directamente en Mongo:
 
-## Resources
+```bash
+docker exec IGLESIA_CONTAINER mongosh iglesia --eval 'db.users.updateOne({email:"tu@correo.cl"},{$set:{roles:["ADMIN"]}})'
+```
 
-Check out a few resources that may come in handy when working with NestJS:
+Desde ahí, ese ADMIN asigna roles a los demás con `PATCH /api/auth/:id`.
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Auto-instrument your application with [NestJS Observe](https://observe.nestjs.com). Distributed tracing, metrics, and logging made easy. Error tracking and performance monitoring for your NestJS applications.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+## Scripts
 
-## Support
+| Comando | Para qué |
+|---|---|
+| `yarn start:dev` | Desarrollo, se reinicia al guardar |
+| `yarn build` | Compila a `dist/` |
+| `yarn start:prod` | Corre lo compilado |
+| `yarn test` | Tests unitarios (Vitest) |
+| `yarn lint` | Revisión de código (oxlint) |
+| `yarn format` | Formatea con Prettier |
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+## Mapa rápido
 
-## Stay in touch
+```
+src/
+├── main.ts            Arranque: prefijo /api, CORS, validación global
+├── app.module.ts      Une todos los módulos y conecta Mongo
+├── conf/              Configuración (config.yaml)
+├── common/            Utilidades compartidas: paginación, validar ids, búsqueda sin tildes
+├── auth/              Usuarios, login, tokens, roles, menú
+├── iglesias/          Directorio de iglesias
+├── actividades/       Calendario de actividades
+└── noticias/          Noticias y comunicados
+```
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+## Problemas conocidos
 
-## License
+Cosas detectadas que aún no se corrigen; están explicadas en el documento correspondiente.
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+- **El login revela qué correos existen** (responde distinto si el correo no está registrado). Ver [seguridad](docs/seguridad.md#problemas-conocidos).
+- **Un usuario bloqueado por intentos fallidos no tiene cómo desbloquearse** salvo editando `retry` en Mongo.
+- **Si `STAGE` no es `dev` ni `production`, la URI de Mongo queda vacía** y la app no conecta. Además se imprime la URI en consola (en producción puede mostrar la clave).
+- **El puerto solo se lee de `config.yaml`**; la variable `PORT` no tiene efecto.
+- **CORS acepta cualquier origen**; antes de producción hay que limitarlo a los dominios del sitio y del panel.
+- **Los tests de `auth` y `app` fallan** porque no tienen sus dependencias simuladas (los de `iglesias` y `common` sí pasan).

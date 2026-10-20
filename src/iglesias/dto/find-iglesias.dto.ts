@@ -1,0 +1,24 @@
+import { IsBoolean, IsOptional, IsString } from 'class-validator';
+import { PaginationDto } from '../../common/dto/pagination.dto.js';
+import { ToBoolean } from '../../common/transforms/to-boolean.transform.js';
+
+/**
+ * Query params de GET /api/iglesias.
+ * Hereda search, limit y offset de PaginationDto.
+ *
+ * @example GET /iglesias?distrito=Norte&search=central&limit=20&offset=0
+ */
+export class FindIglesiasDto extends PaginationDto {
+
+    /** Distrito exacto, sin distinguir mayúsculas ni tildes ("araucania" = "Araucanía"). */
+    @IsString()
+    @IsOptional()
+    distrito?: string;
+
+    // Solo para el panel: ?isActive=false lista las desactivadas. Los visitantes siempre ven las activas
+    /** Por defecto true. El servicio lo ignora si quien consulta no gestiona iglesias. */
+    @ToBoolean()
+    @IsBoolean()
+    @IsOptional()
+    isActive?: boolean;
+}

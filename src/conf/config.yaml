@@ -3,6 +3,9 @@ mongo:
   url: "mongodb://localhost:27017"
   dbName: "iglesia"
   collectionName: "users"
+  collectionNameIglesia: "iglesias"
+  collectionNameActividad: "actividades"
+  collectionNameNoticia: "noticias"
 jwt:
   secret: ""
   expiresIn: ""
