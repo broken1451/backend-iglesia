@@ -25,7 +25,8 @@ src/
 │
 ├── iglesias/                   Directorio de iglesias
 ├── actividades/                Calendario de actividades
-└── noticias/                   Noticias y comunicados
+├── noticias/                   Noticias y comunicados
+└── correo/                     Envío de correos (@nestjs/mail) → ver correo.md
 ```
 
 Cada módulo de negocio (`iglesias`, `actividades`, `noticias`) tiene la misma forma:

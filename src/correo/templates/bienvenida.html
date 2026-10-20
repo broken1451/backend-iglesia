@@ -1,0 +1,46 @@
+{{! Correo de bienvenida al registrarse. Lo arma BienvenidaMail (src/correo/mails/bienvenida.mail.ts). }}
+{{! Las llaves dobles escapan el valor: un nombre con HTML se muestra como texto, no se ejecuta. }}
+<p style="margin:0 0 6px;font-size:13px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:#c9a24b;">Bienvenida</p>
+<h1 style="margin:0 0 20px;font-family:Georgia,'Times New Roman',serif;font-size:28px;line-height:1.25;font-weight:normal;color:#1f3a5f;">Hola, {{ nombre }}</h1>
+
+<p style="margin:0 0 28px;">Nos alegra tenerte. Tu cuenta en el panel de la Iglesia ya está creada y lista para usar.</p>
+
+{{! Recuadro con el correo de la cuenta }}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 32px;">
+<tr>
+<td style="background-color:#f6f3eb;border-left:4px solid #c9a24b;border-radius:6px;padding:16px 20px;">
+<p style="margin:0 0 2px;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:#8a8f99;">Tu cuenta</p>
+<p style="margin:0;font-size:16px;font-weight:600;color:#1f3a5f;">{{ email }}</p>
+</td>
+</tr>
+</table>
+
+{{! Próximos pasos, con el número en un círculo }}
+<p style="margin:0 0 16px;font-size:16px;font-weight:600;color:#1f3a5f;">¿Qué sigue?</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 32px;">
+<tr>
+<td width="40" valign="top" style="padding:0 0 16px;"><div style="width:28px;height:28px;border-radius:14px;background-color:#1f3a5f;color:#ffffff;font-size:14px;font-weight:600;line-height:28px;text-align:center;">1</div></td>
+<td valign="top" style="padding:3px 0 16px;">Ingresa al panel con tu correo y la contraseña que elegiste.</td>
+</tr>
+<tr>
+<td width="40" valign="top" style="padding:0 0 16px;"><div style="width:28px;height:28px;border-radius:14px;background-color:#1f3a5f;color:#ffffff;font-size:14px;font-weight:600;line-height:28px;text-align:center;">2</div></td>
+<td valign="top" style="padding:3px 0 16px;">Por ahora puedes consultar la información de las iglesias y las actividades.</td>
+</tr>
+<tr>
+<td width="40" valign="top"><div style="width:28px;height:28px;border-radius:14px;background-color:#1f3a5f;color:#ffffff;font-size:14px;font-weight:600;line-height:28px;text-align:center;">3</div></td>
+<td valign="top" style="padding-top:3px;">Un administrador te asignará los permisos que correspondan a tu función.</td>
+</tr>
+</table>
+
+{{#if panelUrl}}
+{{! Botón hecho con tabla: así se ve igual en Outlook, que no respeta padding en enlaces }}
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 32px;">
+<tr>
+<td style="background-color:#1f3a5f;border-radius:8px;">
+<a href="{{ panelUrl }}" style="display:inline-block;padding:14px 32px;font-size:16px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:8px;">Ir al panel →</a>
+</td>
+</tr>
+</table>
+{{/if}}
+
+<p style="margin:0;padding-top:24px;border-top:1px solid #ece7dc;font-size:13px;color:#8a8f99;">Si no creaste esta cuenta, puedes ignorar este correo.</p>

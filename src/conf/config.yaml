@@ -7,17 +7,27 @@ mongo:
   collectionNameActividad: "actividades"
   collectionNameNoticia: "noticias"
 jwt:
-  secret: ""
+  secret: "="
   expiresIn: ""
 email:
+  # Cómo se entregan los correos: "file" (guarda .eml en ./mails, para desarrollo),
+  # "log" (los escribe en la consola) o "smtp" (los envía de verdad con host/port/auth).
+  # Con smtp, la clave va en MAIL_PASSWORD (y el usuario en MAIL_USER) del .env
+  transport: "smtp"
+  # Con smtp: además de enviarlo, guarda una copia .eml en ./mails
+  guardarCopia: true
+  # Si tiene valor, el correo de bienvenida muestra el botón "Ir al panel"
+  panelUrl: ""
   service: ""
+  # Gmail. La cuenta (MAIL_USER) y la contraseña de aplicación (MAIL_PASSWORD) van en .env
   host: ""
   port: ""
   auth:
     user: ""
     pass: ""
   from:
-    name: ""
+    name: "Iglesia"
+    # Vacío = la cuenta de MAIL_USER (con Gmail tiene que ser esa misma)
     address: ""
   subject: ""
 google:

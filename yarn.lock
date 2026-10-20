@@ -586,6 +586,18 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@nestjs/mail@npm:0.0.1":
+  version: 0.0.1
+  resolution: "@nestjs/mail@npm:0.0.1"
+  peerDependencies:
+    "@nestjs/common": ^11.0.0 || ^12.0.0
+    "@nestjs/core": ^11.0.0 || ^12.0.0
+    reflect-metadata: ^0.1.13 || ^0.2.0
+    rxjs: ^7.1.0
+  checksum: 10c0/5b7f7385ab3580de7c175b92c3d120b1eb87d20a1d639c52ff22cd59db0b385c27aaf52d7eb99673fcaad69db2615409afd0998f714b9d66461a1d3c6caf26a4
+  languageName: node
+  linkType: hard
+
 "@nestjs/mapped-types@npm:*":
   version: 12.0.0
   resolution: "@nestjs/mapped-types@npm:12.0.0"
@@ -2411,6 +2423,7 @@ __metadata:
     "@nestjs/common": "npm:^12.0.1"
     "@nestjs/config": "npm:^12.0.1"
     "@nestjs/core": "npm:^12.0.1"
+    "@nestjs/mail": "npm:0.0.1"
     "@nestjs/mapped-types": "npm:*"
     "@nestjs/mau": "npm:^0.2.6"
     "@nestjs/mongoose": "npm:^12.0.0"

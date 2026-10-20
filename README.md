@@ -11,6 +11,7 @@ Hecha con **NestJS 12**, **MongoDB** (Mongoose) y los módulos oficiales `@nestj
 | [docs/guia-de-uso.md](docs/guia-de-uso.md) | **Empieza aquí.** Primeros pasos, flujos del panel y del sitio, código para el frontend, recetas y problemas comunes |
 | [docs/api.md](docs/api.md) | Todos los endpoints: permisos, campos, ejemplos `curl` y respuestas reales, incluidos los errores |
 | [docs/seguridad.md](docs/seguridad.md) | Login, tokens, roles, menú y quién puede hacer qué (y por qué) |
+| [docs/correo.md](docs/correo.md) | Envío de correos: configuración (desarrollo y SMTP), plantillas y cómo agregar un correo nuevo |
 | [docs/arquitectura.md](docs/arquitectura.md) | Estructura de carpetas, el camino de un request y las decisiones de diseño |
 | [docs/iglesia.postman_collection.json](docs/iglesia.postman_collection.json) | Colección de Postman con los 40 requests listos (el login guarda el token solo) |
 | [docs/requests.http](docs/requests.http) | Los mismos requests para la extensión REST Client de VS Code |
@@ -30,6 +31,11 @@ STAGE=dev                 # dev: usa la BD de config.yaml | production: usa URI 
 JWT_SECRET=...            # mínimo 32 caracteres; firma los tokens
 PORT_DB=27017             # puerto de Mongo para docker-compose
 MONGODB_DATABASE=iglesia
+
+# Correo (config.yaml viene con Gmail, ver docs/correo.md). Sin MAIL_USER la app no arranca;
+# para no enviar nada, pon email.transport: "file" en config.yaml
+MAIL_USER=tu-cuenta@gmail.com
+MAIL_PASSWORD=...         # contraseña de aplicación de Gmail (16 letras), no la de la cuenta
 
 # Solo en producción (STAGE=production):
 # URI=mongodb://usuario:clave@host:27017

@@ -19,6 +19,10 @@ async function bootstrap() {
   // origin: true acepta CUALQUIER origen: antes de producción limitarlo a los dominios propios
   app.enableCors({ origin: true });
 
+  // Al apagar (Ctrl+C, un deploy), Nest avisa a los módulos: el de correo espera los
+  // envíos en curso y cierra las conexiones SMTP en vez de cortarlas a la mitad
+  app.enableShutdownHooks();
+
   // Todas las rutas quedan bajo /api (ej: /api/iglesias)
   app.setGlobalPrefix('api');
 

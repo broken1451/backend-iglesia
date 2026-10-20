@@ -1,6 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { PasswordHasher, TokenService } from '@nestjs/authentication';
+import { Mailer } from '@nestjs/mail';
+import { BienvenidaMail } from '../correo/mails/bienvenida.mail.js';
+import { capitalizar } from '../common/utils/texto.utils.js';
 import { isValidObjectId, Model } from 'mongoose';
 import { CreateAuthDto } from './dto/create-auth.dto.js';
 import { LoginAuthDto } from './dto/login-auth.dto.js';
@@ -14,15 +17,19 @@ import { getMenu } from './menu/menu.config.js';
 @Injectable()
 export class AuthService {
 
+  private readonly logger = new Logger(AuthService.name);
+
   /**
    * @param userModel      modelo de Mongo de los usuarios
    * @param passwordHasher hashea y verifica contraseñas con scrypt (lo provee @nestjs/authentication)
    * @param tokenService   firma los tokens JWT con la configuración de auth.module.ts
+   * @param mailer         envía correos (lo provee @nestjs/mail, configurado en CorreoModule)
    */
   constructor(
     @InjectModel(Auth.name) private readonly userModel: Model<Auth>,
     private readonly passwordHasher: PasswordHasher,
     private readonly tokenService: TokenService,
+    private readonly mailer: Mailer,
   ) { }
 
   /**
@@ -51,7 +58,34 @@ export class AuthService {
       password: await this.passwordHasher.hash(createAuthDto.password),
     });
 
+    this.enviarBienvenida(user);
+
     return { user, ...(await this.getJWT(user)) };
+  }
+
+  /**
+   * Envía el correo de bienvenida EN SEGUNDO PLANO: no se espera (sin await).
+   *
+   * Por qué: el Mailer reintenta hasta 3 veces con esperas de hasta 30 segundos. Si se
+   * esperara, una caída del servidor de correo haría que el registro tarde o falle, y la
+   * cuenta ya quedó creada. Así el registro responde de inmediato y, si el correo falla
+   * definitivamente, solo queda el error en el log.
+   *
+   * idempotencyKey: identifica este correo; si se reenviara, el servidor de correo lo
+   * reconoce como el mismo y no llega duplicado.
+   */
+  private enviarBienvenida(user: Auth) {
+    const { name, last_name, email } = user;
+    this.mailer
+      .send(BienvenidaMail, {
+        // Nombre visible del destinatario: "José María Muñoz" (se guarda en minúsculas)
+        to: { name: capitalizar(`${name} ${last_name}`), address: email },
+        data: { name, last_name, email },
+        idempotencyKey: `bienvenida-${user._id.toString()}`,
+      })
+      .catch((error: unknown) =>
+        this.logger.error(`No se pudo enviar la bienvenida a ${email}`, error instanceof Error ? error.stack : error),
+      );
   }
 
   /**
