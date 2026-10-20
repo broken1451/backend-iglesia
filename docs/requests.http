@@ -1,0 +1,384 @@
+# Requests de la API Iglesia para la extensión REST Client de VS Code.
+# 1) Cambia @email y @password. 2) "Send Request" en Login. 3) Los demás usan su token.
+# Los "Crear ..." tienen nombre: los Ver/Editar/Desactivar usan el _id que devolvieron.
+# Documentación completa: docs/api.md
+
+@baseUrl = http://localhost:3500/api
+@email = admin@iglesia.cl
+@password = cambia-esta-clave
+@token = {{login.response.body.accessToken}}
+@usuarioId = {{registrarUsuario.response.body.user._id}}
+@iglesiaId = {{crearIglesia.response.body._id}}
+@actividadId = {{crearActividad.response.body._id}}
+@noticiaId = {{crearBorrador.response.body._id}}
+
+######## AUTH ########
+
+### Auth · Login
+# Inicia sesión con las variables email y password. Guarda el accessToken en la variable token. La respuesta trae el menú según el rol.
+# @name login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}"
+}
+
+
+### Auth · Registrar usuario
+# Crea una cuenta con rol IGLESIA. No acepta roles. Guarda su _id en usuarioId.
+# @name registrarUsuario
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "name": "José",
+  "last_name": "Muñoz",
+  "email": "jose.munoz@iglesia.cl",
+  "password": "secreto123"
+}
+
+
+### Auth · Mi usuario (me)
+# Usuario dueño del token. Cualquier rol.
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{token}}
+
+
+### Auth · Listar usuarios
+# Solo ADMIN.
+GET {{baseUrl}}/auth
+Authorization: Bearer {{token}}
+
+
+### Auth · Ver usuario
+# Solo ADMIN.
+GET {{baseUrl}}/auth/{{usuarioId}}
+Authorization: Bearer {{token}}
+
+
+### Auth · Asignar roles
+# Solo ADMIN. Reemplaza todos los roles.
+PATCH {{baseUrl}}/auth/{{usuarioId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "roles": [
+    "DISTRITO",
+    "COMUNICACIONES"
+  ]
+}
+
+
+### Auth · Cambiar contraseña
+# Solo ADMIN.
+PATCH {{baseUrl}}/auth/{{usuarioId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "password": "nueva-clave-123"
+}
+
+
+### Auth · Desactivar usuario
+# Solo ADMIN. Sus tokens dejan de servir al instante.
+DELETE {{baseUrl}}/auth/{{usuarioId}}
+Authorization: Bearer {{token}}
+
+
+### Auth · Reactivar usuario
+# Solo ADMIN.
+PATCH {{baseUrl}}/auth/{{usuarioId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "isActive": true
+}
+
+
+######## IGLESIAS ########
+
+### Iglesias · Listar (sitio)
+# Sin token: solo activas. Ordenadas por distrito y nombre.
+GET {{baseUrl}}/iglesias?limit=20&offset=0
+
+
+### Iglesias · Filtrar por distrito y nombre
+# distrito exacto y search "contiene", ambos sin tildes ni mayúsculas.
+GET {{baseUrl}}/iglesias?distrito=araucania&search=temuco
+
+
+### Iglesias · Listar desactivadas (panel)
+# Con token de ADMIN, DISTRITO o IGLESIA. Sin token se ignora isActive.
+GET {{baseUrl}}/iglesias?isActive=false
+Authorization: Bearer {{token}}
+
+
+### Iglesias · Distritos
+# Distritos con iglesias activas y cuántas tiene cada uno.
+GET {{baseUrl}}/iglesias/distritos
+
+
+### Iglesias · Crear iglesia
+# DISTRITO o ADMIN. lat y lng van juntas. Guarda el _id en iglesiaId.
+# @name crearIglesia
+POST {{baseUrl}}/iglesias
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "distrito": "Araucanía",
+  "name": "Iglesia Bautista de Temuco",
+  "direccion": "Av. Alemania 0450, Temuco",
+  "reuniones": "Domingo 11:00, Miércoles 19:30",
+  "encargado": "Pastor Juan Pérez",
+  "email": "contacto@iglesiatemuco.cl",
+  "lat": -38.7359,
+  "lng": -72.5904
+}
+
+
+### Iglesias · Ver iglesia
+# Público. Desactivada → 404 para visitantes.
+GET {{baseUrl}}/iglesias/{{iglesiaId}}
+
+
+### Iglesias · Editar iglesia
+# DISTRITO o ADMIN. Solo cambia lo enviado.
+PATCH {{baseUrl}}/iglesias/{{iglesiaId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "reuniones": "Domingo 10:30"
+}
+
+
+### Iglesias · Quitar ubicación
+# Las dos coordenadas a la vez.
+PATCH {{baseUrl}}/iglesias/{{iglesiaId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "lat": null,
+  "lng": null
+}
+
+
+### Iglesias · Desactivar iglesia
+# Solo ADMIN. Borrado lógico.
+DELETE {{baseUrl}}/iglesias/{{iglesiaId}}
+Authorization: Bearer {{token}}
+
+
+### Iglesias · Reactivar iglesia
+# DISTRITO o ADMIN.
+PATCH {{baseUrl}}/iglesias/{{iglesiaId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "isActive": true
+}
+
+
+######## ACTIVIDADES ########
+
+### Actividades · Próximas (sitio)
+# Vigentes desde la fecha (incluye las en curso), ordenadas por fecha. Usa la fecha de hoy.
+GET {{baseUrl}}/actividades?desde=2026-10-01&limit=50
+
+
+### Actividades · Solo nacionales
+# Actividades sin distrito.
+GET {{baseUrl}}/actividades?distrito=nacional
+
+
+### Actividades · Listar desactivadas (panel)
+# Con token de un rol que ve Actividades.
+GET {{baseUrl}}/actividades?isActive=false
+Authorization: Bearer {{token}}
+
+
+### Actividades · Crear actividad (varios días, con inscripción)
+# COMUNICACIONES, DISTRITO o ADMIN. Fechas con zona horaria. Guarda el _id en actividadId.
+# @name crearActividad
+POST {{baseUrl}}/actividades
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "titulo": "Retiro de jóvenes",
+  "descripcion": "Dos días de alabanza, enseñanza y convivencia para jóvenes de 15 a 30 años.",
+  "fecha_inicio": "2026-10-24T09:00:00-03:00",
+  "fecha_fin": "2026-10-25T18:00:00-03:00",
+  "lugar": "Temuco",
+  "distrito": "Araucanía",
+  "inscripcion_url": "https://forms.gle/retiro2026"
+}
+
+
+### Actividades · Crear actividad nacional (un día)
+# Sin distrito → "Nacional". Sin fecha_fin → el sitio muestra la hora.
+POST {{baseUrl}}/actividades
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "titulo": "Reunión de la Junta de Pastores",
+  "descripcion": "Reunión ordinaria. El enlace se envía por correo a los pastores.",
+  "fecha_inicio": "2026-11-14T10:00:00-03:00",
+  "lugar": "En línea"
+}
+
+
+### Actividades · Ver actividad
+# Público.
+GET {{baseUrl}}/actividades/{{actividadId}}
+
+
+### Actividades · Editar actividad
+# Solo cambia lo enviado.
+PATCH {{baseUrl}}/actividades/{{actividadId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "lugar": "Temuco, Camping Las Araucarias"
+}
+
+
+### Actividades · Quitar inscripción
+# Quita el botón "Inscribirme".
+PATCH {{baseUrl}}/actividades/{{actividadId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "inscripcion_url": null
+}
+
+
+### Actividades · Desactivar actividad
+# Solo ADMIN.
+DELETE {{baseUrl}}/actividades/{{actividadId}}
+Authorization: Bearer {{token}}
+
+
+### Actividades · Reactivar actividad
+# COMUNICACIONES, DISTRITO o ADMIN.
+PATCH {{baseUrl}}/actividades/{{actividadId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "isActive": true
+}
+
+
+######## NOTICIAS ########
+
+### Noticias · Listar (sitio)
+# Sin token: solo publicadas, la más reciente primero. Sin el campo contenido.
+GET {{baseUrl}}/noticias?limit=9
+
+
+### Noticias · Filtrar por categoría
+# Misiones, Comunicado oficial, Oración o Historia.
+GET {{baseUrl}}/noticias?categoria=Misiones
+
+
+### Noticias · Borradores (panel)
+# Con token de ADMIN o COMUNICACIONES.
+GET {{baseUrl}}/noticias?publicado=false
+Authorization: Bearer {{token}}
+
+
+### Noticias · Crear noticia publicada
+# COMUNICACIONES o ADMIN. El autor sale del token. fecha_publicacion opcional (para noticias antiguas).
+POST {{baseUrl}}/noticias
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "titulo": "Congreso de Misiones 2026 reunió a iglesias de todo el país",
+  "resumen": "Tres días de formación en Koyamentu con invitados de Brasil, México y Chile.",
+  "contenido": "Entre el 13 y el 15 de marzo se realizó el Congreso de Misiones...",
+  "categoria": "Misiones",
+  "imagen": "https://cdn.iglesia.cl/noticias/congreso-misiones.jpg",
+  "publicado": true,
+  "fecha_publicacion": "2026-03-16T12:00:00-03:00"
+}
+
+
+### Noticias · Crear borrador
+# Sin publicado → borrador. Guarda el _id en noticiaId.
+# @name crearBorrador
+POST {{baseUrl}}/noticias
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "titulo": "Unánimes a una oración",
+  "resumen": "Convocatoria nacional a un tiempo de oración por nuestras iglesias y por Chile.",
+  "contenido": "Invitamos a todas las iglesias...",
+  "categoria": "Oración"
+}
+
+
+### Noticias · Ver noticia
+# Con contenido. Un borrador solo lo ve el panel (con token).
+GET {{baseUrl}}/noticias/{{noticiaId}}
+Authorization: Bearer {{token}}
+
+
+### Noticias · Publicar borrador
+# Si no tenía fecha_publicacion, queda la de ahora.
+PATCH {{baseUrl}}/noticias/{{noticiaId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "publicado": true
+}
+
+
+### Noticias · Editar noticia
+# Solo cambia lo enviado.
+PATCH {{baseUrl}}/noticias/{{noticiaId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "resumen": "Convocatoria nacional a orar juntos el próximo domingo."
+}
+
+
+### Noticias · Desactivar noticia
+# Solo ADMIN.
+DELETE {{baseUrl}}/noticias/{{noticiaId}}
+Authorization: Bearer {{token}}
+
+
+### Noticias · Reactivar noticia
+# COMUNICACIONES o ADMIN.
+PATCH {{baseUrl}}/noticias/{{noticiaId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "isActive": true
+}
+
+
+######## SALUD ########
+
+### Salud · API arriba
+# Responde "Hello World!".
+GET {{baseUrl}}
+

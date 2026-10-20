@@ -1,0 +1,1217 @@
+{
+  "info": {
+    "name": "API Iglesia",
+    "description": "Todos los endpoints de la API Iglesia. 1) Ajusta baseUrl, email y password en Variables. 2) Ejecuta Auth → Login: el token se guarda solo. 3) Los \"Crear ...\" guardan el _id para usarlo en Ver/Editar/Desactivar. Documentación completa: docs/api.md",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3500/api"
+    },
+    {
+      "key": "email",
+      "value": "admin@iglesia.cl"
+    },
+    {
+      "key": "password",
+      "value": "cambia-esta-clave"
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "usuarioId",
+      "value": ""
+    },
+    {
+      "key": "iglesiaId",
+      "value": ""
+    },
+    {
+      "key": "actividadId",
+      "value": ""
+    },
+    {
+      "key": "noticiaId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "description": "Registro, login y gestión de usuarios. Ejecuta primero \"Login\": guarda el token para todos los demás requests.",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const r = pm.response.json();",
+                  "pm.collectionVariables.set(\"token\", r.accessToken);",
+                  "pm.test(\"login correcto\", () => pm.expect(r.accessToken).to.be.a(\"string\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Inicia sesión con las variables email y password. Guarda el accessToken en la variable token. La respuesta trae el menú según el rol."
+          }
+        },
+        {
+          "name": "Registrar usuario",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const r = pm.response.json();",
+                  "const id = r.user?._id;",
+                  "if (id) pm.collectionVariables.set(\"usuarioId\", id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"José\",\n  \"last_name\": \"Muñoz\",\n  \"email\": \"jose.munoz@iglesia.cl\",\n  \"password\": \"secreto123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "description": "Crea una cuenta con rol IGLESIA. No acepta roles. Guarda su _id en usuarioId."
+          }
+        },
+        {
+          "name": "Mi usuario (me)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "me"
+              ]
+            },
+            "description": "Usuario dueño del token. Cualquier rol."
+          }
+        },
+        {
+          "name": "Listar usuarios",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth"
+              ]
+            },
+            "description": "Solo ADMIN."
+          }
+        },
+        {
+          "name": "Ver usuario",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/{{usuarioId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "{{usuarioId}}"
+              ]
+            },
+            "description": "Solo ADMIN."
+          }
+        },
+        {
+          "name": "Asignar roles",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"roles\": [\n    \"DISTRITO\",\n    \"COMUNICACIONES\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/{{usuarioId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "{{usuarioId}}"
+              ]
+            },
+            "description": "Solo ADMIN. Reemplaza todos los roles."
+          }
+        },
+        {
+          "name": "Cambiar contraseña",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"password\": \"nueva-clave-123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/{{usuarioId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "{{usuarioId}}"
+              ]
+            },
+            "description": "Solo ADMIN."
+          }
+        },
+        {
+          "name": "Desactivar usuario",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/{{usuarioId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "{{usuarioId}}"
+              ]
+            },
+            "description": "Solo ADMIN. Sus tokens dejan de servir al instante."
+          }
+        },
+        {
+          "name": "Reactivar usuario",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isActive\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/{{usuarioId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "{{usuarioId}}"
+              ]
+            },
+            "description": "Solo ADMIN."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Iglesias",
+      "description": "Directorio de iglesias. GET públicos; crear/editar DISTRITO, desactivar ADMIN.",
+      "item": [
+        {
+          "name": "Listar (sitio)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/iglesias?limit=20&offset=0",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "iglesias"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                }
+              ]
+            },
+            "description": "Sin token: solo activas. Ordenadas por distrito y nombre."
+          }
+        },
+        {
+          "name": "Filtrar por distrito y nombre",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/iglesias?distrito=araucania&search=temuco",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "iglesias"
+              ],
+              "query": [
+                {
+                  "key": "distrito",
+                  "value": "araucania"
+                },
+                {
+                  "key": "search",
+                  "value": "temuco"
+                }
+              ]
+            },
+            "description": "distrito exacto y search \"contiene\", ambos sin tildes ni mayúsculas."
+          }
+        },
+        {
+          "name": "Listar desactivadas (panel)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/iglesias?isActive=false",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "iglesias"
+              ],
+              "query": [
+                {
+                  "key": "isActive",
+                  "value": "false"
+                }
+              ]
+            },
+            "description": "Con token de ADMIN, DISTRITO o IGLESIA. Sin token se ignora isActive."
+          }
+        },
+        {
+          "name": "Distritos",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/iglesias/distritos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "iglesias",
+                "distritos"
+              ]
+            },
+            "description": "Distritos con iglesias activas y cuántas tiene cada uno."
+          }
+        },
+        {
+          "name": "Crear iglesia",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const r = pm.response.json();",
+                  "const id = r._id;",
+                  "if (id) pm.collectionVariables.set(\"iglesiaId\", id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"distrito\": \"Araucanía\",\n  \"name\": \"Iglesia Bautista de Temuco\",\n  \"direccion\": \"Av. Alemania 0450, Temuco\",\n  \"reuniones\": \"Domingo 11:00, Miércoles 19:30\",\n  \"encargado\": \"Pastor Juan Pérez\",\n  \"email\": \"contacto@iglesiatemuco.cl\",\n  \"lat\": -38.7359,\n  \"lng\": -72.5904\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/iglesias",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "iglesias"
+              ]
+            },
+            "description": "DISTRITO o ADMIN. lat y lng van juntas. Guarda el _id en iglesiaId."
+          }
+        },
+        {
+          "name": "Ver iglesia",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/iglesias/{{iglesiaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "iglesias",
+                "{{iglesiaId}}"
+              ]
+            },
+            "description": "Público. Desactivada → 404 para visitantes."
+          }
+        },
+        {
+          "name": "Editar iglesia",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reuniones\": \"Domingo 10:30\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/iglesias/{{iglesiaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "iglesias",
+                "{{iglesiaId}}"
+              ]
+            },
+            "description": "DISTRITO o ADMIN. Solo cambia lo enviado."
+          }
+        },
+        {
+          "name": "Quitar ubicación",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"lat\": null,\n  \"lng\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/iglesias/{{iglesiaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "iglesias",
+                "{{iglesiaId}}"
+              ]
+            },
+            "description": "Las dos coordenadas a la vez."
+          }
+        },
+        {
+          "name": "Desactivar iglesia",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/iglesias/{{iglesiaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "iglesias",
+                "{{iglesiaId}}"
+              ]
+            },
+            "description": "Solo ADMIN. Borrado lógico."
+          }
+        },
+        {
+          "name": "Reactivar iglesia",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isActive\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/iglesias/{{iglesiaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "iglesias",
+                "{{iglesiaId}}"
+              ]
+            },
+            "description": "DISTRITO o ADMIN."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Actividades",
+      "description": "Calendario. GET públicos; crear/editar COMUNICACIONES o DISTRITO, desactivar ADMIN.",
+      "item": [
+        {
+          "name": "Próximas (sitio)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/actividades?desde=2026-10-01&limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actividades"
+              ],
+              "query": [
+                {
+                  "key": "desde",
+                  "value": "2026-10-01"
+                },
+                {
+                  "key": "limit",
+                  "value": "50"
+                }
+              ]
+            },
+            "description": "Vigentes desde la fecha (incluye las en curso), ordenadas por fecha. Usa la fecha de hoy."
+          }
+        },
+        {
+          "name": "Solo nacionales",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/actividades?distrito=nacional",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actividades"
+              ],
+              "query": [
+                {
+                  "key": "distrito",
+                  "value": "nacional"
+                }
+              ]
+            },
+            "description": "Actividades sin distrito."
+          }
+        },
+        {
+          "name": "Listar desactivadas (panel)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/actividades?isActive=false",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actividades"
+              ],
+              "query": [
+                {
+                  "key": "isActive",
+                  "value": "false"
+                }
+              ]
+            },
+            "description": "Con token de un rol que ve Actividades."
+          }
+        },
+        {
+          "name": "Crear actividad (varios días, con inscripción)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const r = pm.response.json();",
+                  "const id = r._id;",
+                  "if (id) pm.collectionVariables.set(\"actividadId\", id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titulo\": \"Retiro de jóvenes\",\n  \"descripcion\": \"Dos días de alabanza, enseñanza y convivencia para jóvenes de 15 a 30 años.\",\n  \"fecha_inicio\": \"2026-10-24T09:00:00-03:00\",\n  \"fecha_fin\": \"2026-10-25T18:00:00-03:00\",\n  \"lugar\": \"Temuco\",\n  \"distrito\": \"Araucanía\",\n  \"inscripcion_url\": \"https://forms.gle/retiro2026\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/actividades",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actividades"
+              ]
+            },
+            "description": "COMUNICACIONES, DISTRITO o ADMIN. Fechas con zona horaria. Guarda el _id en actividadId."
+          }
+        },
+        {
+          "name": "Crear actividad nacional (un día)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titulo\": \"Reunión de la Junta de Pastores\",\n  \"descripcion\": \"Reunión ordinaria. El enlace se envía por correo a los pastores.\",\n  \"fecha_inicio\": \"2026-11-14T10:00:00-03:00\",\n  \"lugar\": \"En línea\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/actividades",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actividades"
+              ]
+            },
+            "description": "Sin distrito → \"Nacional\". Sin fecha_fin → el sitio muestra la hora."
+          }
+        },
+        {
+          "name": "Ver actividad",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/actividades/{{actividadId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actividades",
+                "{{actividadId}}"
+              ]
+            },
+            "description": "Público."
+          }
+        },
+        {
+          "name": "Editar actividad",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"lugar\": \"Temuco, Camping Las Araucarias\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/actividades/{{actividadId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actividades",
+                "{{actividadId}}"
+              ]
+            },
+            "description": "Solo cambia lo enviado."
+          }
+        },
+        {
+          "name": "Quitar inscripción",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"inscripcion_url\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/actividades/{{actividadId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actividades",
+                "{{actividadId}}"
+              ]
+            },
+            "description": "Quita el botón \"Inscribirme\"."
+          }
+        },
+        {
+          "name": "Desactivar actividad",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/actividades/{{actividadId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actividades",
+                "{{actividadId}}"
+              ]
+            },
+            "description": "Solo ADMIN."
+          }
+        },
+        {
+          "name": "Reactivar actividad",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isActive\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/actividades/{{actividadId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actividades",
+                "{{actividadId}}"
+              ]
+            },
+            "description": "COMUNICACIONES, DISTRITO o ADMIN."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Noticias",
+      "description": "Noticias y comunicados. GET públicos (solo publicadas); crear/editar COMUNICACIONES, desactivar ADMIN.",
+      "item": [
+        {
+          "name": "Listar (sitio)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/noticias?limit=9",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "noticias"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "9"
+                }
+              ]
+            },
+            "description": "Sin token: solo publicadas, la más reciente primero. Sin el campo contenido."
+          }
+        },
+        {
+          "name": "Filtrar por categoría",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/noticias?categoria=Misiones",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "noticias"
+              ],
+              "query": [
+                {
+                  "key": "categoria",
+                  "value": "Misiones"
+                }
+              ]
+            },
+            "description": "Misiones, Comunicado oficial, Oración o Historia."
+          }
+        },
+        {
+          "name": "Borradores (panel)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/noticias?publicado=false",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "noticias"
+              ],
+              "query": [
+                {
+                  "key": "publicado",
+                  "value": "false"
+                }
+              ]
+            },
+            "description": "Con token de ADMIN o COMUNICACIONES."
+          }
+        },
+        {
+          "name": "Crear noticia publicada",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titulo\": \"Congreso de Misiones 2026 reunió a iglesias de todo el país\",\n  \"resumen\": \"Tres días de formación en Koyamentu con invitados de Brasil, México y Chile.\",\n  \"contenido\": \"Entre el 13 y el 15 de marzo se realizó el Congreso de Misiones...\",\n  \"categoria\": \"Misiones\",\n  \"imagen\": \"https://cdn.iglesia.cl/noticias/congreso-misiones.jpg\",\n  \"publicado\": true,\n  \"fecha_publicacion\": \"2026-03-16T12:00:00-03:00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/noticias",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "noticias"
+              ]
+            },
+            "description": "COMUNICACIONES o ADMIN. El autor sale del token. fecha_publicacion opcional (para noticias antiguas)."
+          }
+        },
+        {
+          "name": "Crear borrador",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const r = pm.response.json();",
+                  "const id = r._id;",
+                  "if (id) pm.collectionVariables.set(\"noticiaId\", id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titulo\": \"Unánimes a una oración\",\n  \"resumen\": \"Convocatoria nacional a un tiempo de oración por nuestras iglesias y por Chile.\",\n  \"contenido\": \"Invitamos a todas las iglesias...\",\n  \"categoria\": \"Oración\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/noticias",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "noticias"
+              ]
+            },
+            "description": "Sin publicado → borrador. Guarda el _id en noticiaId."
+          }
+        },
+        {
+          "name": "Ver noticia",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/noticias/{{noticiaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "noticias",
+                "{{noticiaId}}"
+              ]
+            },
+            "description": "Con contenido. Un borrador solo lo ve el panel (con token)."
+          }
+        },
+        {
+          "name": "Publicar borrador",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"publicado\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/noticias/{{noticiaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "noticias",
+                "{{noticiaId}}"
+              ]
+            },
+            "description": "Si no tenía fecha_publicacion, queda la de ahora."
+          }
+        },
+        {
+          "name": "Editar noticia",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"resumen\": \"Convocatoria nacional a orar juntos el próximo domingo.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/noticias/{{noticiaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "noticias",
+                "{{noticiaId}}"
+              ]
+            },
+            "description": "Solo cambia lo enviado."
+          }
+        },
+        {
+          "name": "Desactivar noticia",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/noticias/{{noticiaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "noticias",
+                "{{noticiaId}}"
+              ]
+            },
+            "description": "Solo ADMIN."
+          }
+        },
+        {
+          "name": "Reactivar noticia",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isActive\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/noticias/{{noticiaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "noticias",
+                "{{noticiaId}}"
+              ]
+            },
+            "description": "COMUNICACIONES o ADMIN."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Salud",
+      "item": [
+        {
+          "name": "API arriba",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": []
+            },
+            "description": "Responde \"Hello World!\"."
+          }
+        }
+      ]
+    }
+  ]
+}
