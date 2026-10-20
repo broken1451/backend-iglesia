@@ -61,8 +61,28 @@ Authorization: Bearer eyJhbGciOi...
 - El DTO no acepta `roles`. **Por qué:** si el registro público aceptara roles, cualquiera podría crearse una cuenta ADMIN. Los roles los asigna un ADMIN con `PATCH /api/auth/:id`.
 - Nombres y apellidos aceptan tildes y ñ (`\p{L}`), y se guardan en minúsculas.
 
+### Login sin pistas
+El login responde **el mismo `401 Invalid credentials`** si el correo no existe, si el usuario está desactivado o si la contraseña es incorrecta.
+- **Por qué:** si respondiera distinto ("ese correo no existe"), cualquiera podría averiguar quién tiene cuenta probando correos.
+- **También en el tiempo:** con un correo inexistente, `verify()` compara igual contra un hash falso, así la respuesta tarda lo mismo.
+
 ### Bloqueo por intentos fallidos
-Cada contraseña incorrecta suma 1 a `retry`. Con 3, el login responde "blocked". Un login correcto lo vuelve a 0.
+Cada contraseña incorrecta suma 1 a `retry` (con `$inc`, atómico: dos intentos simultáneos suman 2). Con 3 (`MAX_INTENTOS` en `auth.service.ts`) la cuenta queda bloqueada:
+- Con la contraseña **correcta**, el login responde `403` explicando que está bloqueada: es el dueño real y necesita saber qué pasa.
+- Con una **incorrecta**, sigue respondiendo el `401` de siempre: a quien está adivinando no se le confirma que la cuenta existe.
+- **Desbloqueo:** un ADMIN envía `PATCH /api/auth/:id` con `{ "unblock": true }`, o le asigna una contraseña nueva. Un login correcto también vuelve `retry` a 0.
+
+### Secretos
+Todo lo secreto va en `.env` (no se sube a git): `JWT_SECRET`, `MAIL_PASSWORD` (la clave del correo, ver [correo.md](correo.md)) y en producción `URI` (incluye la clave de Mongo). Al arrancar, la URI de Mongo se muestra en consola **con la clave oculta** (`mongodb://usuario:****@host`).
+
+### CORS
+`CORS_ORIGINS` en `.env` limita qué dominios pueden llamar a la API desde el navegador:
+
+```env
+CORS_ORIGINS=https://iglesia.cl,https://panel.iglesia.cl
+```
+
+Sin definir acepta cualquier dominio (cómodo en desarrollo). Con `STAGE=production` y sin definir, la API arranca igual pero lo avisa en la consola.
 
 ## Autorización
 
@@ -177,9 +197,7 @@ Un usuario con varios roles ve **la unión** de sus menús.
 
 ## Problemas conocidos
 
-- **El login revela qué correos existen.** Responde "does not exist" si el correo no está y "Invalid credentials" si la contraseña está mal. Con eso, cualquiera puede averiguar quién tiene cuenta. Debería responder siempre "Invalid credentials".
-- **El chequeo `!user.isActive` en el login nunca se cumple**, porque la consulta ya filtra `isActive: true`. Un usuario desactivado recibe "does not exist".
-- **No hay forma de desbloquear un usuario** por intentos fallidos: `UpdateAuthDto` no acepta `retry`. Hoy se hace editando Mongo.
+- **`POST /api/iglesias` está abierto sin login** (el `@Roles(ValidRoles.distrito)` está comentado). Ver [api.md](api.md#post-iglesias).
 - **No hay límite de intentos por IP.** El bloqueo por usuario no frena a alguien que prueba una contraseña común contra muchos correos. Se resolvería con `@nestjs/throttler`.
 - **Las contraseñas aceptan desde 6 caracteres.** Se recomienda mínimo 8.
-- Los ids en `/auth/:id` se validan en el servicio y no con `ParseMongoIdPipe` como en los demás módulos (funciona igual, solo es inconsistente).
+- **Un ADMIN puede quitarse su propio rol ADMIN** (o desactivarse); si es el único, nadie más puede administrar y hay que arreglarlo en Mongo.

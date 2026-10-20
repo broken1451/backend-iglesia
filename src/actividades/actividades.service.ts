@@ -35,8 +35,10 @@ export class ActividadesService {
    *
    * @param query filtros:
    *   - desde: actividades que siguen vigentes desde esa fecha (incluye las que
-   *     empezaron antes y aún no terminan, como el 2º día de un retiro)
-   *   - hasta: actividades que empiezan hasta esa fecha
+   *     empezaron antes y aún no terminan, como el 2º día de un retiro). Con solo
+   *     el día, desde las 00:00 de ese día en hora de Chile
+   *   - hasta: actividades que empiezan hasta esa fecha (con solo el día, "2026-12-31",
+   *     incluye todo ese día en hora de Chile)
    *   - distrito: exacto, sin tildes ni mayúsculas ("Nacional" trae las nacionales)
    *   - search: en el título, sin tildes ni mayúsculas
    *   - isActive, limit, offset
@@ -50,12 +52,13 @@ export class ActividadesService {
     const filter: QueryFilter<Actividad> = { isActive: verInactivas ? (isActive ?? true) : true };
     if (distrito) filter.distrito = equalsRegex(distrito);
     if (search) filter.titulo = containsRegex(search);
-    if (hasta) filter.fecha_inicio = { $lte: new Date(hasta) };
+    if (hasta) filter.fecha_inicio = { $lte: finDelDia(hasta) };
     if (desde) {
       // Sigue vigente si termina después de "desde" (o, sin fecha_fin, si empieza después)
+      const inicio = inicioDelDia(desde);
       filter.$or = [
-        { fecha_fin: { $gte: new Date(desde) } },
-        { fecha_fin: null, fecha_inicio: { $gte: new Date(desde) } },
+        { fecha_fin: { $gte: inicio } },
+        { fecha_fin: null, fecha_inicio: { $gte: inicio } },
       ];
     }
 
@@ -131,3 +134,27 @@ const checkFechas = (inicio: string | Date, fin?: string | Date | null) => {
     throw new BadRequestException('fecha_fin must be after fecha_inicio');
   }
 };
+
+/** Solo la fecha, sin hora: "2026-12-31". */
+const SOLO_FECHA = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Inicio del día para el filtro ?desde=, en hora de Chile.
+ *
+ * Con solo la fecha ("2026-10-01"), new Date() da las 00:00 UTC, que en Chile todavía es
+ * la noche del día ANTERIOR. Se usa UTC-3 (horario de verano), así en invierno (UTC-4) se
+ * cuela como mucho la última hora del día anterior, pero nunca queda fuera algo del día pedido.
+ * Si trae hora ("2026-10-01T08:00:00-03:00"), se usa tal cual.
+ */
+const inicioDelDia = (desde: string) => new Date(SOLO_FECHA.test(desde) ? `${desde}T00:00:00-03:00` : desde);
+
+/**
+ * Fin del día para el filtro ?hasta=, en hora de Chile.
+ *
+ * Con solo la fecha ("2026-12-31"), new Date() da las 00:00 UTC, que en Chile es la tarde
+ * del día ANTERIOR: una actividad del 31 a las 19:00 quedaba fuera. Se usa UTC-4 (horario
+ * de invierno), así en verano (UTC-3) se cuela como mucho la primera hora del día siguiente,
+ * pero nunca queda fuera algo del día pedido.
+ * Si trae hora ("2026-12-31T18:00:00-03:00"), se usa tal cual.
+ */
+const finDelDia = (hasta: string) => new Date(SOLO_FECHA.test(hasta) ? `${hasta}T23:59:59.999-04:00` : hasta);

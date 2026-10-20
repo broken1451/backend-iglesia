@@ -315,6 +315,39 @@
             },
             "description": "Solo ADMIN."
           }
+        },
+        {
+          "name": "Desbloquear usuario",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"unblock\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/{{usuarioId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "{{usuarioId}}"
+              ]
+            },
+            "description": "Solo ADMIN. Desbloquea una cuenta bloqueada por 3 intentos fallidos (retry vuelve a 0)."
+          },
+          "response": []
         }
       ]
     },

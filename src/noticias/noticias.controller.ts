@@ -25,10 +25,10 @@ export class NoticiasController {
 
   /**
    * GET /api/noticias — Lista paginada, la más reciente primero.
-   * Filtros: ?publicado, ?categoria, ?search, ?limit, ?offset.
+   * Filtros: ?publicado, ?isActive, ?categoria, ?search, ?limit, ?offset.
    */
   // Visitante (o rol sin acceso a Noticias): solo publicadas.
-  // ADMIN / COMUNICACIONES con token: también los borradores, para el panel.
+  // ADMIN / COMUNICACIONES con token: también los borradores y las desactivadas, para el panel.
   @OptionalAuth()
   @Get()
   findAll(@Query() query: FindNoticiasDto, @CurrentUser() user: Auth | null) {

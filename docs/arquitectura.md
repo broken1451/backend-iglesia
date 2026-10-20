@@ -16,10 +16,12 @@ src/
 │
 ├── common/                     Código que usan todos los módulos
 │   ├── dto/pagination.dto.ts           ?search, ?limit, ?offset
+│   ├── filters/mongoose-exception.filter.ts  Errores del esquema de Mongo → 400 en vez de 500
 │   ├── pipes/parse-mongo-id.pipe.ts    Rechaza ids que no son de Mongo (400)
 │   ├── transforms/to-boolean.transform.ts      "true"/"false" de la URL → boolean
 │   ├── transforms/normalize-spaces.transform.ts "  a   b " → "a b"
-│   └── utils/mongo.utils.ts            Búsqueda sin tildes, duplicados, paginación
+│   ├── utils/mongo.utils.ts            Búsqueda sin tildes, duplicados, paginación
+│   └── utils/texto.utils.ts            capitalizar("josé muñoz") → "José Muñoz"
 │
 ├── auth/                       Usuarios, login y permisos → ver seguridad.md
 │
@@ -71,20 +73,25 @@ flowchart TD
 | Línea | Por qué |
 |---|---|
 | `setGlobalPrefix('api')` | Todas las rutas empiezan con `/api`, así se distinguen de las del front si comparten dominio |
-| `enableCors({ origin: true })` | Permite que el sitio y el panel (en otro dominio/puerto) llamen a la API. **Abierto a todos: limitar antes de producción** |
+| `enableCors(...)` | Permite que el sitio y el panel (en otro dominio/puerto) llamen a la API. Los dominios salen de `CORS_ORIGINS`; sin definir, acepta todos |
+| `enableShutdownHooks()` | Al apagar, el módulo de correo espera los envíos en curso y cierra las conexiones SMTP |
 | `ValidationPipe({ whitelist, forbidNonWhitelisted })` | Valida todo lo que entra y rechaza campos desconocidos |
-| `configService.get('port')` | El puerto sale de `config.yaml` (3500) |
+| `useGlobalFilters(new MongooseExceptionFilter(...))` | Lo que rechaza el esquema de Mongo (un obligatorio enviado como `null`) responde 400 y no 500 |
+| `PORT` o `configService.get('port')` | La variable `PORT` (la que fijan los hostings) o, si no, `port` de `config.yaml` (3500) |
 
 ## Configuración: `conf/` y `.env`
 
 Hay dos fuentes, y cada una tiene su propósito:
 
 - **`config.yaml`**: valores que no son secretos y pueden ir en git (puerto, nombres de colecciones, URL de Mongo local). Se copia a `dist/` al compilar (lo indica `nest-cli.json`).
-- **`.env`**: secretos y lo que cambia por ambiente (`JWT_SECRET`, `STAGE`, `URI`). No va en git.
+- **`.env`**: secretos y lo que cambia por ambiente (`JWT_SECRET`, `STAGE`, `URI`, `MAIL_USER`, `MAIL_PASSWORD`, `CORS_ORIGINS`). No va en git.
 
 La conexión a Mongo (`app.module.ts`) elige según `STAGE`:
 - `dev` → `mongo.url` y `mongo.dbName` de `config.yaml`
 - `production` → variables `URI` y `DBNAME`
+- cualquier otro valor → la app no arranca y dice por qué (antes intentaba conectarse a una URI vacía)
+
+Al conectar se muestra la URI en consola **con la clave oculta**.
 
 Cada módulo toma el nombre de su colección de `config.yaml` (`collectionNameIglesia`, etc.). **Por qué:** permite apuntar a colecciones distintas sin tocar código (por ejemplo, para pruebas).
 
@@ -115,6 +122,9 @@ Todos los `GET` de lista responden igual:
 `definedOnly()` quita los campos `undefined` antes de guardar.
 - **Por qué:** al validar, los campos del DTO que no venían en el body llegan como `undefined`. Sin este filtro, editar solo el título de una iglesia borraría su `isActive` (este bug existió y se corrigió).
 - `null` sí se respeta: sirve para borrar un valor a propósito (por ejemplo `"inscripcion_url": null` quita el botón de inscripción).
+
+### Errores del esquema → 400 en vez de 500
+El DTO valida casi todo, pero algunos casos solo los detecta Mongoose al guardar. Ejemplo: un PATCH con `{ "titulo": null }` pasa el DTO (`@IsOptional()` acepta `null`), pero el esquema dice que `titulo` es obligatorio. `MongooseExceptionFilter` (registrado en `main.ts`) convierte ese error en un 400 con la misma forma que los del `ValidationPipe`: `{ "message": ["The titulo is required"], ... }`.
 
 ### Duplicados → 400 en vez de 500
 Los índices únicos de Mongo lanzan un error con código `11000`. `rethrowDuplicate()` lo convierte en un 400 con un mensaje claro ("ya existe una iglesia con ese nombre en ese distrito").
@@ -153,6 +163,7 @@ El calendario del sitio. Los campos salen directamente del diseño de la tarjeta
 
 - **`fecha_fin` no puede ser anterior a `fecha_inicio`**, tampoco combinando lo guardado con un PATCH.
 - **Filtro `?desde=`** devuelve también las actividades que empezaron antes pero siguen en curso (un retiro de dos días aparece el segundo día).
+- **`?desde=` y `?hasta=` con solo el día** (`2026-12-31`) se toman en hora de Chile y `hasta` incluye el día completo. Antes, `new Date("2026-12-31")` daba las 00:00 UTC (la tarde del 30 en Chile) y una actividad del 31 a las 19:00 quedaba fuera. Como Chile cambia entre UTC-3 y UTC-4, el rango se toma un poco más amplio: puede colarse una hora del día vecino, pero nunca queda fuera algo del día pedido.
 - Vienen **ordenadas por fecha ascendente**: el front las agrupa por mes tal como llegan.
 
 ### Noticias
@@ -161,6 +172,14 @@ Noticias y comunicados del sitio.
 - **Borradores:** se crean con `publicado: false`. La primera vez que se publican se guarda `fecha_publicacion`. Esa fecha también se puede enviar a mano, para cargar noticias antiguas con su fecha original.
 - **El autor sale del token**, nunca del body: nadie puede publicar a nombre de otro. En la respuesta solo va su nombre, no su correo.
 - **El listado no trae `contenido`** (el texto completo): las tarjetas solo usan `resumen`, y así la respuesta pesa mucho menos. El detalle (`/:id`) sí lo trae.
+- El panel lista las desactivadas con `?isActive=false`, igual que en iglesias y actividades.
+
+### Correo
+Envío de correos con `@nestjs/mail`; hoy, la bienvenida al registrarse. Detalle completo en [correo.md](correo.md).
+- **Una clase por correo** (`correo/mails/*.mail.ts`) que devuelve asunto, plantilla y datos; **una plantilla HTML** por correo (`correo/templates/*.html`), todas envueltas por `layout.html` (encabezado y pie comunes).
+- **Transporte configurable** (`email.transport`): `file` guarda `.eml` en `mails/` sin enviar, `log` lo escribe en consola, `smtp` lo envía de verdad. Con `guardarCopia: true`, `smtp` además deja el `.eml` (`EnvioConCopia`).
+- **En segundo plano:** el registro no espera el correo. **Por qué:** el Mailer reintenta hasta 3 veces con esperas; si el servidor de correo está caído, el registro tardaría o fallaría aunque la cuenta ya se creó.
+- **Falla al arrancar** si `smtp` está mal configurado (sin host o sin remitente): el error se ve al desplegar, no con el primer usuario.
 
 ## Tests
 
@@ -171,5 +190,6 @@ yarn test
 - `common/utils/mongo.utils.spec.ts`: búsqueda sin tildes, escape de caracteres especiales, `definedOnly`.
 - `iglesias/iglesias.service.spec.ts`: visitante vs. panel, coordenadas, duplicados, que un PATCH no pise campos. Usa un modelo de Mongo simulado, no necesita base de datos.
 - `iglesias/iglesias.controller.spec.ts`: que cada rol reciba la vista correcta.
-
-Los specs de `auth` y `app` vienen del generador de Nest y fallan porque no tienen sus dependencias simuladas.
+- `auth/auth.service.spec.ts`: login (mismo 401 para correo inexistente y clave mala, bloqueo, desbloqueo), registro (minúsculas, hash, bienvenida en segundo plano, duplicados) y edición. Usa un `PasswordHasher` real pero barato, así compara hashes de verdad.
+- `correo/mails/bienvenida.mail.spec.ts`: renderiza la bienvenida con las plantillas reales y `InMemoryMailTransport` (nombre, escape de HTML, botón del panel).
+- `correo/correo.transport.spec.ts`: qué transporte se arma según la configuración, y que `EnvioConCopia` guarde la copia solo si el envío salió.

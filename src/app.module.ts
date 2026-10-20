@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Logger, Module } from '@nestjs/common';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { AuthModule } from './auth/auth.module.js';
@@ -29,31 +29,30 @@ import { CorreoModule } from './correo/correo.module.js';
     // Conexión a MongoDB. Según la variable STAGE del .env:
     // - "dev": usa mongo.url y mongo.dbName de config.yaml (el Mongo local de docker-compose)
     // - "production": usa las variables de entorno URI y DBNAME
-    // Ojo: con cualquier otro valor de STAGE, la URI queda vacía y la app no conecta
+    // Con cualquier otro valor (o sin datos de conexión) la app no arranca y dice por qué
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
-        if (!configService.get('mongo.url') && !process.env.URI) {
-          throw new Error('MongoDB URI is not defined in the environment variables or config file');
+        const stage = process.env.STAGE;
+        const { uri, dbName } =
+          stage === 'production'
+            ? { uri: process.env.URI, dbName: process.env.DBNAME }
+            : stage === 'dev'
+              ? { uri: configService.get<string>('mongo.url'), dbName: configService.get<string>('mongo.dbName') }
+              : {};
+
+        if (!uri) {
+          throw new Error(
+            stage === 'dev' || stage === 'production'
+              ? `Falta la URI de MongoDB (${stage === 'dev' ? 'mongo.url en config.yaml' : 'URI en .env'})`
+              : `STAGE debe ser "dev" o "production" en .env (vale "${stage ?? ''}")`,
+          );
         }
 
-        let uri = '';
-        let dbName = '';
-        if (process.env.STAGE === 'dev') {
-          uri = String(configService.get('mongo.url'))
-          dbName = String(configService.get('mongo.dbName'))
-        } else if (process.env.STAGE === 'production') {
-          uri = String(process.env.URI)
-          dbName = String(process.env.DBNAME)
-        }
-        // Ojo: en producción la URI puede incluir usuario y clave, y esto la imprime en los logs
-        console.log('MongoDB URI:', uri);
-        console.log('MongoDB Database Name:', dbName);
-        return {
-          uri,
-          dbName
-        }
+        // Se muestra la URI sin la clave: en producción incluye usuario y contraseña
+        new Logger('MongoDB').log(`Conectando a ${uri.replace(/\/\/([^:/@]+):[^@]*@/, '//$1:****@')} (base "${dbName}")`);
+        return { uri, dbName };
       },
     }),
 

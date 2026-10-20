@@ -54,7 +54,7 @@ Debe responder `Hello World!`.
 curl -X POST http://localhost:3500/api/auth/register -H "Content-Type: application/json" -d '{"name":"Ana","last_name":"Rojas","email":"ana@iglesia.cl","password":"una-clave-segura"}'
 ```
 
-Queda con rol `IGLESIA`.
+Queda con rol `IGLESIA`, y te llega el correo de bienvenida (o, si `email.transport` es `"file"`, queda como `.eml` en la carpeta `mails/`). Para configurar el envío ver [correo.md](correo.md).
 
 ### 3. Convertirla en ADMIN
 El registro nunca da el rol ADMIN (si lo diera, cualquiera podría darse ese rol). El primero se asigna directamente en Mongo:
@@ -118,6 +118,8 @@ GET /api/auth/me     Authorization: Bearer <token>
 
 | Respuesta | Qué hacer en el panel |
 |---|---|
+| `401` en el login | "Correo o contraseña incorrectos" (la API no distingue cuál de los dos, a propósito) |
+| `403` en el login | Mostrar el mensaje: la cuenta está bloqueada y debe pedirle a un ADMIN que la desbloquee |
 | `401` | Borrar el token y mandar al login (venció, o el usuario fue desactivado) |
 | `403` | Mostrar "No tienes permiso para esta acción" |
 | `400` con `message` lista | Mostrar cada mensaje junto a su campo del formulario |
@@ -147,7 +149,7 @@ Los mismos `GET` del sitio, con token, aceptan:
 |---|---|
 | Iglesias | `GET /api/iglesias?isActive=false` |
 | Actividades | `GET /api/actividades?isActive=false` |
-| Noticias | `GET /api/noticias?publicado=false` |
+| Noticias | `GET /api/noticias?publicado=false` (borradores) o `?isActive=false` (desactivadas) |
 
 ---
 
@@ -389,10 +391,15 @@ function enlaceGoogleCalendar(a) {
 | Quitar la ubicación de una iglesia | `PATCH /api/iglesias/:id` con `{ "lat": null, "lng": null }` |
 | Cambiar los roles de alguien | `PATCH /api/auth/:id` con `{ "roles": ["DISTRITO"] }` (reemplaza todos) |
 | Quitarle el acceso a alguien al instante | `DELETE /api/auth/:id` |
-| Desbloquear una cuenta (3 intentos fallidos) | Hoy solo por Mongo: `db.users.updateOne({email:"x@iglesia.cl"},{$set:{retry:0}})` |
+| Desbloquear una cuenta (3 intentos fallidos) | `PATCH /api/auth/:id` con `{ "unblock": true }` |
 | Cambiar la contraseña de alguien | `PATCH /api/auth/:id` con `{ "password": "nueva-clave" }` |
 | Agregar una categoría de noticias | Sumarla en `src/noticias/interfaces/categoria.enum.ts` (y su ícono en el front) |
 | Darle una sección del menú a otro rol | Agregar el rol en `src/auth/menu/menu.config.ts`: cambia el menú **y** los permisos de la API |
+| Ver un correo sin enviarlo | `email.transport: "file"` en `config.yaml`, y abrir el `.eml` de `mails/` |
+| Enviar correos de verdad | `transport: "smtp"` + `MAIL_USER` / `MAIL_PASSWORD` en `.env` ([correo.md](correo.md#enviar-de-verdad-smtp)) |
+| Cambiar el diseño o el texto de un correo | Editar `src/correo/templates/*.html` (en desarrollo se ve sin reiniciar) |
+| Agregar un correo nuevo | Ver [correo.md](correo.md#agregar-un-correo-nuevo) |
+| Limitar qué dominios llaman a la API | `CORS_ORIGINS=https://iglesia.cl,https://panel.iglesia.cl` en `.env` |
 
 ---
 
@@ -410,6 +417,10 @@ function enlaceGoogleCalendar(a) {
 | La hora sale 3 horas corrida | La fecha se mostró en UTC, o se envió sin zona | Enviar con `-03:00` y mostrar con `timeZone: 'America/Santiago'` |
 | La búsqueda no encuentra algo | El filtro `distrito` es exacto | Para "contiene", usar `search` (busca en el nombre) |
 | Un visitante no ve una noticia | Es un borrador, o está desactivada | Publicarla (`PATCH` `{ "publicado": true }`) |
-| `400` "The user ... is blocked" | 3 contraseñas incorrectas seguidas | Poner `retry: 0` en Mongo (ver recetas) |
+| `403` "The user is blocked..." en el login | 3 contraseñas incorrectas seguidas | Un ADMIN: `PATCH /api/auth/:id` con `{ "unblock": true }` |
+| `401` "Invalid credentials" con la clave correcta | El usuario fue desactivado | Un ADMIN lo reactiva: `PATCH /api/auth/:id` `{ "isActive": true }` |
 | La app no arranca: "JWT_SECRET must be defined" | Falta el secreto o es corto | Ponerlo en `.env` con 32 caracteres o más |
-| La app no conecta a Mongo | `STAGE` no es `dev` ni `production` | Revisar `STAGE` en `.env` |
+| La app no arranca: "STAGE debe ser dev o production" | `STAGE` falta o tiene otro valor | Revisar `STAGE` en `.env` |
+| La app no arranca: "hay que definir MAIL_USER" | `transport: "smtp"` sin cuenta de correo | Llenar `MAIL_USER` / `MAIL_PASSWORD` en `.env`, o usar `transport: "file"` |
+| La app no arranca: "falta email.host" | `transport: "smtp"` sin servidor | Poner `host` y `port` en `config.yaml` (Gmail: `smtp.gmail.com`, `587`) |
+| No llega el correo de bienvenida | Clave de Gmail incorrecta, o fue a spam | Ver la consola (`No se pudo enviar...`) y [correo.md](correo.md#si-no-llega) |

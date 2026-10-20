@@ -17,6 +17,13 @@ export class FindNoticiasDto extends PaginationDto {
     @IsOptional()
     publicado?: boolean;
 
+    // Solo para el panel: ?isActive=false lista las desactivadas, para reactivarlas
+    /** Por defecto true. El servicio lo ignora si quien consulta no gestiona noticias. */
+    @ToBoolean()
+    @IsBoolean()
+    @IsOptional()
+    isActive?: boolean;
+
     /** Filtra por una categoría de NoticiaCategoria. */
     @IsEnum(NoticiaCategoria)
     @IsOptional()

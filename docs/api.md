@@ -49,9 +49,11 @@ Todos los errores tienen la misma forma:
 | **400** | Se envió un campo que no existe en el endpoint | `["property roles should not exist"]` |
 | **400** | Id con formato inválido | `"abc is not a valid id"` |
 | **400** | Regla de negocio (duplicado, fechas, coordenadas) | `"lat and lng must be sent together"` |
+| **400** | Un campo obligatorio enviado como `null` en un PATCH | `["The titulo is required"]` |
 | **401** | Sin token | `"Unauthorized"` (con `"errorCode": "missing_credentials"`) |
 | **401** | Token mal formado, vencido o de un usuario desactivado | `"malformed token"` / `"unknown subject"` |
-| **401** | Contraseña incorrecta en el login | `"Invalid credentials"` |
+| **401** | Login: correo no registrado o contraseña incorrecta (misma respuesta) | `"Invalid credentials"` |
+| **403** | Login: cuenta bloqueada por intentos fallidos | `"The user is blocked after too many failed attempts; an ADMIN must unblock it"` |
 | **403** | Con token, pero el rol no tiene permiso | `"Forbidden"` |
 | **404** | No existe, o el visitante no puede verlo (desactivado o borrador) | `"Iglesia with id 6ad7... not found"` |
 
@@ -115,7 +117,7 @@ Los caracteres especiales se buscan tal cual: `?search=(central` no rompe nada.
 
 `DELETE` nunca borra: marca el registro con `isActive: false`.
 - Deja de aparecer en el sitio (los visitantes reciben 404).
-- El panel lo puede listar con `?isActive=false` (iglesias y actividades).
+- El panel lo puede listar con `?isActive=false` (iglesias, actividades y noticias).
 - Se recupera con `PATCH` enviando `{ "isActive": true }`.
 
 ### Campos que agrega la API
@@ -194,6 +196,8 @@ curl -X POST http://localhost:3500/api/auth/register \
 ```
 
 Nombre, apellido y correo se guardan en minúsculas. `expiresIn` está en segundos (28800 = 8 horas).
+
+📧 Además se envía el **correo de bienvenida** en segundo plano: la respuesta no lo espera, y si el envío falla el usuario queda registrado igual (el error queda en la consola). Ver [correo.md](correo.md).
 
 **Errores**
 
@@ -292,25 +296,19 @@ Con **varios roles** se recibe la unión. Por ejemplo, `["DISTRITO", "COMUNICACI
 
 **Errores**
 
-Contraseña incorrecta → `401` (y suma 1 a `retry`):
+Correo no registrado, usuario desactivado o contraseña incorrecta → `401`, **siempre la misma respuesta** (así nadie puede averiguar qué correos tienen cuenta). Una contraseña incorrecta además suma 1 a `retry`:
 
 ```json
 { "message": "Invalid credentials", "error": "Unauthorized", "statusCode": 401 }
 ```
 
-Correo no registrado (o usuario desactivado) → `400`:
+Cuenta bloqueada por 3 intentos fallidos, **con la contraseña correcta** → `403` (con una contraseña incorrecta sigue respondiendo el `401` de arriba):
 
 ```json
-{ "message": "The user with the email nadie@iglesia.cl does not exist", "error": "Bad Request", "statusCode": 400 }
+{ "message": "The user is blocked after too many failed attempts; an ADMIN must unblock it", "error": "Forbidden", "statusCode": 403 }
 ```
 
-Cuenta bloqueada por 3 intentos fallidos → `400`:
-
-```json
-{ "message": "The user with the email x@iglesia.cl is blocked", "error": "Bad Request", "statusCode": 400 }
-```
-
-Un login correcto vuelve `retry` a 0. Una cuenta bloqueada hoy solo se desbloquea poniendo `retry: 0` directamente en Mongo.
+Un login correcto vuelve `retry` a 0. Una cuenta bloqueada la desbloquea un ADMIN con [`PATCH /auth/:id`](#patch-authid) y `{ "unblock": true }`.
 
 ---
 
@@ -401,6 +399,7 @@ curl http://localhost:3500/api/auth/6ad75c2ee4515633ec65ee41 \
 | `password` | texto | 6 a 50 caracteres. Se guarda el nuevo hash |
 | `roles` | lista | **Reemplaza** todos los roles. Solo `ADMIN`, `COMUNICACIONES`, `DISTRITO`, `IGLESIA`, sin repetir |
 | `isActive` | booleano | `false` desactiva, `true` reactiva |
+| `unblock` | booleano | `true` desbloquea una cuenta bloqueada por intentos fallidos (`retry` vuelve a 0). Asignar una `password` nueva también la desbloquea |
 
 **Ejemplo: asignar roles**
 
@@ -436,7 +435,19 @@ El cambio aplica **en el siguiente request** del usuario: no necesita volver a h
 { "isActive": true }
 ```
 
+**Ejemplo: desbloquear** (después de 3 intentos fallidos)
+
+```json
+{ "unblock": true }
+```
+
 **Errores**
+
+Correo que ya usa otro usuario → `400`:
+
+```json
+{ "message": "The email ana@iglesia.cl is already in use", "error": "Bad Request", "statusCode": 400 }
+```
 
 Rol que no existe → `400`:
 
@@ -786,8 +797,8 @@ Más los [campos que agrega la API](#campos-que-agrega-la-api).
 
 | Parámetro | Descripción |
 |---|---|
-| `desde` | Fecha ISO. Actividades **todavía vigentes** desde esa fecha: incluye las que empezaron antes pero aún no terminan |
-| `hasta` | Fecha ISO. Actividades que **empiezan** hasta esa fecha |
+| `desde` | Fecha ISO. Actividades **todavía vigentes** desde esa fecha: incluye las que empezaron antes pero aún no terminan. Con solo el día (`2026-10-01`) cuenta desde las 00:00 de ese día en Chile |
+| `hasta` | Fecha ISO. Actividades que **empiezan** hasta esa fecha. Con solo el día (`2026-12-31`) **incluye todo ese día** en hora de Chile |
 | `distrito` | Exacto, sin mayúsculas ni tildes. `nacional` trae las nacionales |
 | `search` | Busca en el título |
 | `isActive` | `false` lista las desactivadas (solo panel: ADMIN, COMUNICACIONES, DISTRITO, IGLESIA) |
@@ -1031,6 +1042,7 @@ Más los [campos que agrega la API](#campos-que-agrega-la-api).
 | Parámetro | Descripción |
 |---|---|
 | `publicado` | `false` lista los borradores (solo panel). Para el resto se ignora y siempre reciben las publicadas |
+| `isActive` | `false` lista las desactivadas, para reactivarlas (solo panel: ADMIN, COMUNICACIONES). Para el resto se ignora |
 | `categoria` | Una de las 4 categorías (escrita exacta, con tilde: `Oraci%C3%B3n` en la URL) |
 | `search` | Busca en el título |
 | `limit`, `offset` | [Paginación](#listados-y-paginación) |

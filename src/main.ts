@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module.js';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { MongooseExceptionFilter } from './common/filters/mongoose-exception.filter.js';
 
 
 /**
@@ -16,8 +17,14 @@ async function bootstrap() {
   const logger = new Logger('bootstrap');
 
   // Permite que el sitio web y el panel (que viven en otro dominio/puerto) llamen a la API.
-  // origin: true acepta CUALQUIER origen: antes de producción limitarlo a los dominios propios
-  app.enableCors({ origin: true });
+  // CORS_ORIGINS (.env) = dominios permitidos separados por coma, ej:
+  //   CORS_ORIGINS=https://iglesia.cl,https://panel.iglesia.cl
+  // Sin definir acepta CUALQUIER origen (cómodo en desarrollo; en producción hay que definirlo)
+  const origins = process.env.CORS_ORIGINS?.split(',').map((origin) => origin.trim()).filter(Boolean);
+  app.enableCors({ origin: origins?.length ? origins : true });
+  if (!origins?.length && process.env.STAGE === 'production') {
+    logger.warn('CORS_ORIGINS no está definido: la API acepta requests de cualquier dominio');
+  }
 
   // Al apagar (Ctrl+C, un deploy), Nest avisa a los módulos: el de correo espera los
   // envíos en curso y cierra las conexiones SMTP en vez de cortarlas a la mitad
@@ -37,10 +44,14 @@ async function bootstrap() {
     }),
   );
 
-  // El puerto se lee de src/conf/config.yaml (clave "port")
+  // Lo que el DTO no alcanza a validar y rechaza el esquema de Mongo responde 400, no 500.
+  // Recibe el HttpAdapter para responder igual que el resto de los errores de Nest
+  app.useGlobalFilters(new MongooseExceptionFilter(app.getHttpAdapter()));
+
+  // Puerto: la variable PORT (la que suelen fijar los hostings) o, si no, "port" de config.yaml
   const configService = app.get(ConfigService);
-  const port = configService.get<string>('port') || 3000;
-  await app.listen(port ?? 3000);
-  logger.log(`Microservicio de correos iniciado en puerto ${port || process.env.PORT}`);
+  const port = process.env.PORT || configService.get<string>('port') || 3000;
+  await app.listen(port);
+  logger.log(`API iniciada en http://localhost:${port}/api`);
 }
 await bootstrap();

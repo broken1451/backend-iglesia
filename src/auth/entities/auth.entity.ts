@@ -55,7 +55,10 @@ export class Auth extends Document {
     @Prop({ type: Boolean, default: true })
     isActive: boolean;
 
-    /** Intentos de login fallidos seguidos. Con 3 el usuario queda bloqueado; un login correcto lo vuelve a 0. */
+    /**
+     * Intentos de login fallidos seguidos. Con 3 (MAX_INTENTOS) el usuario queda bloqueado;
+     * un login correcto lo vuelve a 0, y un ADMIN lo desbloquea con PATCH { "unblock": true }.
+     */
     @Prop({ type: Number, default: 0 })
     retry: number;
 }

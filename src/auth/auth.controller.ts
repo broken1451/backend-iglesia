@@ -7,6 +7,7 @@ import { UpdateAuthDto } from './dto/update-auth.dto.js';
 import { Auth } from './entities/auth.entity.js';
 import { Roles } from './decorators/roles.decorator.js';
 import { ValidRoles } from './interfaces/role.enum.js';
+import { ParseMongoIdPipe } from '../common/pipes/parse-mongo-id.pipe.js';
 
 /**
  * Rutas de usuarios: /api/auth
@@ -63,21 +64,21 @@ export class AuthController {
   /** GET /api/auth/:id — Un usuario, activo o no (solo ADMIN). */
   @Roles(ValidRoles.admin)
   @Get(':id')
-  findOne(@Param('id') id: string) {
+  findOne(@Param('id', ParseMongoIdPipe) id: string) {
     return this.authService.findOne(id);
   }
 
-  /** PATCH /api/auth/:id — Edita datos, roles o estado de un usuario (solo ADMIN). */
+  /** PATCH /api/auth/:id — Edita datos, roles o estado de un usuario, o lo desbloquea con { "unblock": true } (solo ADMIN). */
   @Roles(ValidRoles.admin)
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateAuthDto: UpdateAuthDto) {
+  update(@Param('id', ParseMongoIdPipe) id: string, @Body() updateAuthDto: UpdateAuthDto) {
     return this.authService.update(id, updateAuthDto);
   }
 
   /** DELETE /api/auth/:id — Desactiva un usuario; sus tokens dejan de servir (solo ADMIN). */
   @Roles(ValidRoles.admin)
   @Delete(':id')
-  remove(@Param('id') id: string) {
+  remove(@Param('id', ParseMongoIdPipe) id: string) {
     return this.authService.remove(id);
   }
 }

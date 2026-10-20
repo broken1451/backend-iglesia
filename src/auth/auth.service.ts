@@ -1,15 +1,19 @@
-import { BadRequestException, Injectable, Logger, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { PasswordHasher, TokenService } from '@nestjs/authentication';
 import { Mailer } from '@nestjs/mail';
 import { BienvenidaMail } from '../correo/mails/bienvenida.mail.js';
 import { capitalizar } from '../common/utils/texto.utils.js';
-import { isValidObjectId, Model } from 'mongoose';
+import { Model } from 'mongoose';
+import { rethrowDuplicate } from '../common/utils/mongo.utils.js';
 import { CreateAuthDto } from './dto/create-auth.dto.js';
 import { LoginAuthDto } from './dto/login-auth.dto.js';
 import { UpdateAuthDto } from './dto/update-auth.dto.js';
 import { Auth } from './entities/auth.entity.js';
 import { getMenu } from './menu/menu.config.js';
+
+/** Intentos de login fallidos seguidos que bloquean al usuario. */
+export const MAX_INTENTOS = 3;
 
 /**
  * Lógica de usuarios: registro, login y la gestión que hace un ADMIN.
@@ -50,13 +54,17 @@ export class AuthService {
       throw new BadRequestException(`The user already exists in the database with the email ${email}`);
     }
 
-    const user = await this.userModel.create({
-      name: createAuthDto.name.toLowerCase().trim(),
-      last_name: createAuthDto.last_name.toLowerCase().trim(),
-      email,
-      // Hash scrypt con salt aleatorio: no se puede revertir (a diferencia de cifrar con AES)
-      password: await this.passwordHasher.hash(createAuthDto.password),
-    });
+    const user = await this.userModel
+      .create({
+        name: createAuthDto.name.toLowerCase().trim(),
+        last_name: createAuthDto.last_name.toLowerCase().trim(),
+        email,
+        // Hash scrypt con salt aleatorio: no se puede revertir (a diferencia de cifrar con AES)
+        password: await this.passwordHasher.hash(createAuthDto.password),
+      })
+      // Dos registros simultáneos con el mismo correo pasan el exists() de arriba;
+      // el índice único frena al segundo y aquí se convierte en el mismo 400
+      .catch((error: unknown) => rethrowDuplicate(error, `The user already exists in the database with the email ${email}`));
 
     this.enviarBienvenida(user);
 
@@ -94,46 +102,40 @@ export class AuthService {
    * Pasos:
    * 1. Busca el usuario activo por correo, pidiendo explícitamente el hash
    *    (.select('+password'), porque el esquema lo oculta por defecto).
-   * 2. Rechaza si no existe o si está bloqueado (3 o más intentos fallidos).
-   * 3. Compara la contraseña con el hash. Si falla, suma un intento.
-   * 4. Si es correcta: actualiza el hash si usa parámetros viejos, reinicia los
+   * 2. Compara la contraseña con el hash, aunque el usuario no exista (ver abajo).
+   * 3. Rechaza con el mismo 401 si el correo no existe o la contraseña no coincide.
+   * 4. Rechaza si está bloqueado (MAX_INTENTOS fallidos seguidos).
+   * 5. Si es correcta: actualiza el hash si usa parámetros viejos, reinicia los
    *    intentos, guarda la fecha de login y genera el token.
    *
-   * @returns { user, accessToken, expiresIn, menu } — el menú según sus roles
-   * @throws BadRequestException (400) si el correo no existe o el usuario está bloqueado
-   * @throws UnauthorizedException (401) si la contraseña es incorrecta
+   * Por qué el mismo 401 para "no existe" y "clave incorrecta": si respondiera distinto,
+   * cualquiera podría averiguar qué correos tienen cuenta probando de a uno.
    *
-   * Problemas conocidos (ver docs/seguridad.md):
-   * - Responder distinto si el correo no existe permite averiguar quién tiene cuenta;
-   *   lo recomendable es responder siempre "Invalid credentials".
-   * - El chequeo de !user.isActive nunca se cumple, porque la consulta ya filtra isActive: true.
+   * @returns { user, accessToken, expiresIn, menu } — el menú según sus roles
+   * @throws UnauthorizedException (401) si el correo no existe, está desactivado o la contraseña es incorrecta
+   * @throws ForbiddenException (403) si está bloqueado por intentos fallidos (lo desbloquea un ADMIN)
    */
   async login({ email, password }: LoginAuthDto) {
     const user = await this.userModel
       .findOne({ email: email.toLowerCase().trim(), isActive: true })
       .select('+password');
 
-
-    if (!user) {
-      throw new BadRequestException(`The user with the email ${email} does not exist`);
-    }
-
-    if (!user.isActive) {
-      throw new BadRequestException(`The user with the email ${email} is not active`);
-    }
-
-    // Bloqueo por intentos fallidos. Hoy solo se desbloquea editando retry en Mongo
-    if (user.retry >= 3) {
-      throw new BadRequestException(`The user with the email ${email} is blocked`);
-    }
-
-
-    // verify() con usuario inexistente compara contra un hash falso, así el tiempo
-    // de respuesta no revela qué correos están registrados
+    // verify() con usuario inexistente (hash undefined) compara contra un hash falso: tarda
+    // lo mismo, así el tiempo de respuesta tampoco revela qué correos están registrados
     const valid = await this.passwordHasher.verify(password, user?.password);
-    if (!user || !valid) {
-      user.retry = user.retry + 1;
-      await user.save();
+    if (!user) throw new UnauthorizedException('Invalid credentials');
+
+    // Bloqueo por intentos fallidos. Se revisa después de comparar la clave para que un
+    // bloqueado tarde lo mismo; solo se le avisa si la clave es correcta (el dueño real)
+    if (user.retry >= MAX_INTENTOS) {
+      throw valid
+        ? new ForbiddenException('The user is blocked after too many failed attempts; an ADMIN must unblock it')
+        : new UnauthorizedException('Invalid credentials');
+    }
+
+    if (!valid) {
+      // $inc es atómico: dos intentos fallidos simultáneos suman 2, no 1
+      await this.userModel.updateOne({ _id: user._id }, { $inc: { retry: 1 } });
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -156,12 +158,10 @@ export class AuthService {
 
   /**
    * Un usuario por id, esté activo o no (el ADMIN necesita ver los desactivados para reactivarlos).
-   * @throws BadRequestException (400) si el id no tiene formato de Mongo
+   * El formato del id ya lo validó ParseMongoIdPipe en el controller.
    * @throws NotFoundException (404) si no existe
    */
   async findOne(id: string) {
-    if (!isValidObjectId(id)) throw new BadRequestException(`${id} is not a valid id`);
-
     const user = await this.userModel.findById(id);
     if (!user) throw new NotFoundException(`User with id ${id} not found`);
     return user;
@@ -170,12 +170,17 @@ export class AuthService {
   /**
    * Edita un usuario. Solo cambia los campos que vienen en el body.
    * Si viene password, guarda su hash; si vienen roles, reemplaza todos los anteriores.
+   *
+   * Desbloqueo: { "unblock": true } (o asignar una contraseña nueva) reinicia los intentos
+   * fallidos, y el usuario puede volver a hacer login.
+   *
    * @returns el usuario actualizado
+   * @throws BadRequestException (400) si el correo nuevo ya lo usa otro usuario
    */
   async update(id: string, updateAuthDto: UpdateAuthDto) {
     const user = await this.findOne(id);
     // Campo por campo: los no enviados llegan como undefined y no deben pisar lo guardado
-    const { password, email, name, last_name, roles, isActive } = updateAuthDto;
+    const { password, email, name, last_name, roles, isActive, unblock } = updateAuthDto;
 
     if (password) user.password = await this.passwordHasher.hash(password);
     if (email) user.email = email.toLowerCase().trim();
@@ -183,8 +188,13 @@ export class AuthService {
     if (last_name) user.last_name = last_name.toLowerCase().trim();
     if (roles) user.roles = roles;
     if (isActive !== undefined) user.isActive = isActive;
+    if (unblock || password) user.retry = 0;
 
-    return user.save();
+    try {
+      return await user.save();
+    } catch (error) {
+      rethrowDuplicate(error, `The email ${user.email} is already in use`);
+    }
   }
 
   /**

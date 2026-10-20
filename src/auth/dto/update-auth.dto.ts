@@ -26,4 +26,9 @@ export class UpdateAuthDto extends PartialType(CreateAuthDto) {
     @IsBoolean()
     @IsOptional()
     isActive?: boolean;
+
+    /** true desbloquea a un usuario bloqueado por intentos fallidos (reinicia el contador). */
+    @IsBoolean()
+    @IsOptional()
+    unblock?: boolean;
 }

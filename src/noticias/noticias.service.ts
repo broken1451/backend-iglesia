@@ -45,13 +45,14 @@ export class NoticiasService {
   /**
    * Lista paginada, de la más reciente a la más antigua.
    *
-   * @param query         filtros: publicado, categoria, search (en el título), limit, offset
+   * @param query         filtros: publicado, isActive, categoria, search (en el título), limit, offset
    * @param verBorradores true solo para roles que gestionan noticias. Si es false, siempre
-   *                      devuelve solo publicadas aunque se pida ?publicado=false.
+   *                      devuelve solo publicadas y activas aunque se pida otra cosa en la URL.
    * @returns { total, limit, offset, data } — sin el campo contenido (solo el detalle lo trae)
    */
-  async findAll({ publicado, categoria, search, limit = 20, offset = 0 }: FindNoticiasDto, verBorradores = false) {
-    const filter: QueryFilter<Noticia> = { isActive: true };
+  async findAll({ publicado, isActive, categoria, search, limit = 20, offset = 0 }: FindNoticiasDto, verBorradores = false) {
+    // El panel puede listar las desactivadas (?isActive=false) para reactivarlas
+    const filter: QueryFilter<Noticia> = { isActive: verBorradores ? (isActive ?? true) : true };
     // Quien no gestiona noticias solo ve las publicadas, pida lo que pida en ?publicado=
     if (!verBorradores) filter.publicado = true;
     else if (publicado !== undefined) filter.publicado = publicado;

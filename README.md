@@ -2,7 +2,7 @@
 
 API REST para la Convención: alimenta el **sitio web público** (directorio de iglesias, calendario de actividades, noticias) y el **panel administrativo** donde cada usuario gestiona lo que su rol le permite.
 
-Hecha con **NestJS 12**, **MongoDB** (Mongoose) y los módulos oficiales `@nestjs/authentication` y `@nestjs/authorization`.
+Hecha con **NestJS 12**, **MongoDB** (Mongoose) y los módulos oficiales `@nestjs/authentication`, `@nestjs/authorization` y `@nestjs/mail`.
 
 ## Documentación
 
@@ -13,7 +13,7 @@ Hecha con **NestJS 12**, **MongoDB** (Mongoose) y los módulos oficiales `@nestj
 | [docs/seguridad.md](docs/seguridad.md) | Login, tokens, roles, menú y quién puede hacer qué (y por qué) |
 | [docs/correo.md](docs/correo.md) | Envío de correos: configuración (desarrollo y SMTP), plantillas y cómo agregar un correo nuevo |
 | [docs/arquitectura.md](docs/arquitectura.md) | Estructura de carpetas, el camino de un request y las decisiones de diseño |
-| [docs/iglesia.postman_collection.json](docs/iglesia.postman_collection.json) | Colección de Postman con los 40 requests listos (el login guarda el token solo) |
+| [docs/iglesia.postman_collection.json](docs/iglesia.postman_collection.json) | Colección de Postman con los 41 requests listos (el login guarda el token solo) |
 | [docs/requests.http](docs/requests.http) | Los mismos requests para la extensión REST Client de VS Code |
 
 ## Puesta en marcha
@@ -36,6 +36,9 @@ MONGODB_DATABASE=iglesia
 # para no enviar nada, pon email.transport: "file" en config.yaml
 MAIL_USER=tu-cuenta@gmail.com
 MAIL_PASSWORD=...         # contraseña de aplicación de Gmail (16 letras), no la de la cuenta
+
+# Dominios que pueden llamar a la API desde el navegador. Sin definir: todos (solo para desarrollo)
+# CORS_ORIGINS=https://iglesia.cl,https://panel.iglesia.cl
 
 # Solo en producción (STAGE=production):
 # URI=mongodb://usuario:clave@host:27017
@@ -83,7 +86,7 @@ Desde ahí, ese ADMIN asigna roles a los demás con `PATCH /api/auth/:id`.
 |---|---|
 | `yarn start:dev` | Desarrollo, se reinicia al guardar |
 | `yarn build` | Compila a `dist/` |
-| `yarn start:prod` | Corre lo compilado |
+| `yarn start:prod` | Corre lo compilado (el puerto puede cambiarse con la variable `PORT`) |
 | `yarn test` | Tests unitarios (Vitest) |
 | `yarn lint` | Revisión de código (oxlint) |
 | `yarn format` | Formatea con Prettier |
@@ -99,16 +102,14 @@ src/
 ├── auth/              Usuarios, login, tokens, roles, menú
 ├── iglesias/          Directorio de iglesias
 ├── actividades/       Calendario de actividades
-└── noticias/          Noticias y comunicados
+├── noticias/          Noticias y comunicados
+└── correo/            Envío de correos: configuración, clases de correo y plantillas HTML
 ```
 
 ## Problemas conocidos
 
 Cosas detectadas que aún no se corrigen; están explicadas en el documento correspondiente.
 
-- **El login revela qué correos existen** (responde distinto si el correo no está registrado). Ver [seguridad](docs/seguridad.md#problemas-conocidos).
-- **Un usuario bloqueado por intentos fallidos no tiene cómo desbloquearse** salvo editando `retry` en Mongo.
-- **Si `STAGE` no es `dev` ni `production`, la URI de Mongo queda vacía** y la app no conecta. Además se imprime la URI en consola (en producción puede mostrar la clave).
-- **El puerto solo se lee de `config.yaml`**; la variable `PORT` no tiene efecto.
-- **CORS acepta cualquier origen**; antes de producción hay que limitarlo a los dominios del sitio y del panel.
-- **Los tests de `auth` y `app` fallan** porque no tienen sus dependencias simuladas (los de `iglesias` y `common` sí pasan).
+- **`POST /api/iglesias` está abierto sin login** (el `@Roles` está comentado). Ver [api.md](docs/api.md#post-iglesias).
+- **No hay límite de intentos por IP** en el login: el bloqueo es por usuario. Ver [seguridad](docs/seguridad.md#problemas-conocidos).
+- **CORS acepta cualquier origen si no se define `CORS_ORIGINS`**; en producción hay que definirlo.
