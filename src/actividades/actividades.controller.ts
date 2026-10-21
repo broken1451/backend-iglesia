@@ -26,7 +26,7 @@ export class ActividadesController {
 
   /**
    * GET /api/actividades — Lista paginada, ordenada por fecha de inicio.
-   * Filtros: ?desde, ?hasta, ?distrito, ?search, ?isActive, ?limit, ?offset.
+   * Filtros: ?desde, ?hasta, ?distrito, ?search, ?isActive, ?pendientes, ?limit, ?offset.
    */
   // Visitante (o rol sin acceso a Actividades): solo activas.
   // ADMIN / COMUNICACIONES / DISTRITO / IGLESIA con token: también las desactivadas, para el panel.
@@ -47,24 +47,24 @@ export class ActividadesController {
    * POST /api/actividades — Crea una actividad.
    * COMUNICACIONES o DISTRITO (y ADMIN). IGLESIA pasa el @Roles de la clase pero no este → 403.
    */
-  // Crear y editar: COMUNICACIONES o DISTRITO (ADMIN siempre pasa)
-  @Roles(ValidRoles.comunicaciones, ValidRoles.distrito)
+  // Crear y editar: MENU.actividades.editan = COMUNICACIONES o DISTRITO (ADMIN siempre pasa)
+  @Roles(...MENU.actividades.editan)
   @Post()
-  create(@Body() createActividadDto: CreateActividadDto) {
-    return this.actividadesService.create(createActividadDto);
+  create(@Body() createActividadDto: CreateActividadDto, @CurrentUser() user: Auth) {
+    return this.actividadesService.create(createActividadDto, user);
   }
 
   /** PATCH /api/actividades/:id — Edita o reactiva una actividad. COMUNICACIONES o DISTRITO (y ADMIN). */
-  @Roles(ValidRoles.comunicaciones, ValidRoles.distrito)
+  @Roles(...MENU.actividades.editan)
   @Patch(':id')
-  update(@Param('id', ParseMongoIdPipe) id: string, @Body() updateActividadDto: UpdateActividadDto) {
-    return this.actividadesService.update(id, updateActividadDto);
+  update(@Param('id', ParseMongoIdPipe) id: string, @Body() updateActividadDto: UpdateActividadDto, @CurrentUser() user: Auth) {
+    return this.actividadesService.update(id, updateActividadDto, user);
   }
 
   /** DELETE /api/actividades/:id — Desactiva la actividad (borrado lógico). Solo ADMIN. */
   @Roles(ValidRoles.admin)
   @Delete(':id')
-  remove(@Param('id', ParseMongoIdPipe) id: string) {
-    return this.actividadesService.remove(id);
+  remove(@Param('id', ParseMongoIdPipe) id: string, @CurrentUser() user: Auth) {
+    return this.actividadesService.remove(id, user);
   }
 }

@@ -150,16 +150,17 @@ Un token vencido o inválido en estas rutas responde 401 (no se trata como visit
 
 ## El menú: una sola fuente de verdad
 
-`menu/menu.config.ts` define, por cada sección, qué roles la ven:
+`menu/menu.config.ts` define, por cada sección, qué roles la ven (`roles`), cuáles además crean y editan (`editan`; ADMIN siempre puede) y la `ruta` del panel:
 
 ```ts
-iglesias: { titulo: 'Iglesias', icono: 'templo', roles: [admin, distrito, iglesia] },
+iglesias: { titulo: 'Iglesias', icono: 'templo', ruta: "iglesias", roles: [admin, distrito, iglesia], editan: [distrito] },
 ```
 
-Ese mismo dato se usa en **dos lugares**:
+Esos mismos datos se usan en **tres lugares**:
 
-1. **El login** devuelve el menú del usuario con `getMenu(user.roles)`.
-2. **Los controllers** lo usan como permiso: `@Roles(...MENU.iglesias.roles)`.
+1. **El login** devuelve el menú del usuario con `getMenu(user.roles)`: `{ titulo, icono, ruta }` de cada sección.
+2. **Los controllers** los usan como permiso: `@Roles(...MENU.iglesias.roles)` en la clase y `@Roles(...MENU.iglesias.editan)` en POST/PATCH.
+3. **La pantalla Resumen** (`GET /api/resumen`) usa `hasMenuAccess()` para decidir qué bloques mostrar y `puedeEditar(user, 'iglesias')` para el "Por hacer" y los accesos rápidos: solo propone lo que la API le dejaría hacer.
 
 **Por qué:** si el menú y los permisos estuvieran escritos por separado, tarde o temprano dirían cosas distintas (un rol vería una sección cuya API le responde 403, o al revés). Así, quitarle "Iglesias" a un rol en el menú también le cierra la API.
 
@@ -192,6 +193,14 @@ Un usuario con varios roles ve **la unión** de sus menús.
 | Noticias POST / PATCH | 401 | 403 | 403 | ✅ | ✅ |
 | Noticias DELETE | 401 | 403 | 403 | 403 | ✅ |
 | **Usuarios** (`/auth`, `/auth/:id`) | 401 | 403 | 403 | 403 | ✅ |
+| **Mensajes** POST (formulario del sitio) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Mensajes GET / PATCH | 401 | ✅ | ✅ | ✅ | ✅ |
+| Mensajes DELETE | 401 | 403 | 403 | 403 | ✅ |
+| **Resumen** `GET /resumen`, `/resumen/por-hacer` | 401 | ✅ (sus secciones) | ✅ (sus secciones) | ✅ (sus secciones) | ✅ (todo) |
+
+En el Resumen, cada bloque depende del rol: lo que no ve en el menú llega en `null`, y el "Por hacer" y los accesos rápidos solo traen lo que puede editar. "Actividad reciente" solo muestra cambios de las secciones que ve, con el nombre de quien los hizo (nunca su correo).
+
+`?isActive=false` y `?pendientes=true` en los listados solo tienen efecto para los roles que ven la sección en el menú; para el resto se ignoran.
 
 **Por qué IGLESIA no edita nada todavía:** no hay forma de saber cuál es *su* iglesia. Si pudiera editar, podría editar cualquiera. Cuando el usuario tenga asociado el id de su iglesia, se puede crear una regla "solo la suya".
 

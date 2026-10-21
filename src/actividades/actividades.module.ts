@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { HistorialModule } from '../historial/historial.module.js';
 import { ActividadesService } from './actividades.service.js';
 import { ActividadesController } from './actividades.controller.js';
 import { Actividad, ActividadSchema } from './entities/actividad.entity.js';
@@ -11,7 +12,11 @@ import { Actividad, ActividadSchema } from './entities/actividad.entity.js';
 @Module({
   controllers: [ActividadesController],
   providers: [ActividadesService],
+  // Exportado para el "Por hacer" del panel (ResumenModule)
+  exports: [ActividadesService],
   imports: [
+    // Cada cambio se anota en el historial ("Actividad reciente" del panel)
+    HistorialModule,
     // Registra el modelo Actividad. El nombre de la colección sale de config.yaml
     // (mongo.collectionNameActividad); si no está definido, usa "actividades"
     MongooseModule.forFeatureAsync([

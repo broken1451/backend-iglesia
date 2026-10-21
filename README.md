@@ -13,7 +13,7 @@ Hecha con **NestJS 12**, **MongoDB** (Mongoose) y los módulos oficiales `@nestj
 | [docs/seguridad.md](docs/seguridad.md) | Login, tokens, roles, menú y quién puede hacer qué (y por qué) |
 | [docs/correo.md](docs/correo.md) | Envío de correos: configuración (desarrollo y SMTP), plantillas y cómo agregar un correo nuevo |
 | [docs/arquitectura.md](docs/arquitectura.md) | Estructura de carpetas, el camino de un request y las decisiones de diseño |
-| [docs/iglesia.postman_collection.json](docs/iglesia.postman_collection.json) | Colección de Postman con los 41 requests listos (el login guarda el token solo) |
+| [docs/iglesia.postman_collection.json](docs/iglesia.postman_collection.json) | Colección de Postman con los 48 requests listos (el login guarda el token solo) |
 | [docs/requests.http](docs/requests.http) | Los mismos requests para la extensión REST Client de VS Code |
 
 ## Puesta en marcha
@@ -103,12 +103,15 @@ src/
 ├── iglesias/          Directorio de iglesias
 ├── actividades/       Calendario de actividades
 ├── noticias/          Noticias y comunicados
-└── correo/            Envío de correos: configuración, clases de correo y plantillas HTML
+├── mensajes/          Formulario de contacto del sitio
+├── historial/         Quién cambió qué (para "Actividad reciente")
+├── correo/            Envío de correos: configuración, clases de correo y plantillas HTML
+└── resumen/           Pantalla Resumen del panel: tarjetas, Por hacer, accesos rápidos, actividad reciente
 ```
 
 ## Problemas conocidos
 
-Cosas detectadas que aún no se corrigen; están explicadas en el documento correspondiente.
+Cosas detectadas que aún no se corrigen; están explicadas en el documento correspondiente. La lista completa de pendientes y mejoras, API por API, está en [api.md → Por hacer](docs/api.md#por-hacer-auth).
 
 - **`POST /api/iglesias` está abierto sin login** (el `@Roles` está comentado). Ver [api.md](docs/api.md#post-iglesias).
 - **No hay límite de intentos por IP** en el login: el bloqueo es por usuario. Ver [seguridad](docs/seguridad.md#problemas-conocidos).

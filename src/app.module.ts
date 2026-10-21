@@ -9,6 +9,8 @@ import { IglesiasModule } from './iglesias/iglesias.module.js';
 import { ActividadesModule } from './actividades/actividades.module.js';
 import { NoticiasModule } from './noticias/noticias.module.js';
 import { CorreoModule } from './correo/correo.module.js';
+import { ResumenModule } from './resumen/resumen.module.js';
+import { MensajesModule } from './mensajes/mensajes.module.js';
 
 /**
  * Módulo raíz: junta la configuración, la conexión a MongoDB, la seguridad (AuthModule)
@@ -60,6 +62,8 @@ import { CorreoModule } from './correo/correo.module.js';
     IglesiasModule,     // /api/iglesias
     ActividadesModule,  // /api/actividades
     NoticiasModule,     // /api/noticias
+    MensajesModule,     // /api/mensajes (formulario de contacto del sitio)
+    ResumenModule,      // /api/resumen (el "Por hacer" del panel)
 
     // Envío de correos (@nestjs/mail). Global: cualquier servicio puede inyectar Mailer
     CorreoModule,

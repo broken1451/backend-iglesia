@@ -46,6 +46,10 @@
     {
       "key": "noticiaId",
       "value": ""
+    },
+    {
+      "key": "mensajeId",
+      "value": ""
     }
   ],
   "item": [
@@ -436,6 +440,29 @@
               ]
             },
             "description": "Con token de ADMIN, DISTRITO o IGLESIA. Sin token se ignora isActive."
+          }
+        },
+        {
+          "name": "Fichas incompletas (panel)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/iglesias?pendientes=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "iglesias"
+              ],
+              "query": [
+                {
+                  "key": "pendientes",
+                  "value": "true"
+                }
+              ]
+            },
+            "description": "Con token de ADMIN, DISTRITO o IGLESIA: solo las iglesias sin horario, dirección o correo. Cada una trae \"pendientes\" con lo que le falta. Sin token se ignora."
           }
         },
         {
@@ -1219,6 +1246,155 @@
               ]
             },
             "description": "COMUNICACIONES o ADMIN."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Mensajes",
+      "item": [
+        {
+          "name": "Enviar mensaje (sitio)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/mensajes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "mensajes"
+              ]
+            },
+            "description": "Público: el formulario de contacto del sitio. Responde { message: \"Mensaje recibido\" }.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Rosa\",\n  \"email\": \"rosa@correo.cl\",\n  \"mensaje\": \"¿A qué hora es el culto?\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Listar sin leer",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/mensajes?leido=false",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "mensajes"
+              ],
+              "query": [
+                {
+                  "key": "leido",
+                  "value": "false"
+                }
+              ]
+            },
+            "description": "Roles que ven Mensajes en el menú. El más nuevo primero."
+          }
+        },
+        {
+          "name": "Marcar leído",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/mensajes/{{mensajeId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "mensajes",
+                "{{mensajeId}}"
+              ]
+            },
+            "description": "Pon el _id de un mensaje en la variable mensajeId.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"leido\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Archivar mensaje",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/mensajes/{{mensajeId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "mensajes",
+                "{{mensajeId}}"
+              ]
+            },
+            "description": "Solo ADMIN. Borrado lógico."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Resumen",
+      "item": [
+        {
+          "name": "Pantalla completa",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/resumen",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "resumen"
+              ]
+            },
+            "description": "Cualquier usuario con sesión. Tarjetas, Por hacer, accesos rápidos, actividad reciente y avance por distrito, según el rol."
+          }
+        },
+        {
+          "name": "Por hacer",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/resumen/por-hacer",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "resumen",
+                "por-hacer"
+              ]
+            },
+            "description": "Cualquier usuario con sesión. Las tarjetas del recuadro \"Por hacer\" según el rol: fichas de iglesia y actividades por completar, borradores de noticias."
           }
         }
       ]

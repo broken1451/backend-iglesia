@@ -25,7 +25,7 @@ export class NoticiasController {
 
   /**
    * GET /api/noticias — Lista paginada, la más reciente primero.
-   * Filtros: ?publicado, ?isActive, ?categoria, ?search, ?limit, ?offset.
+   * Filtros: ?publicado, ?isActive, ?pendientes, ?categoria, ?search, ?limit, ?offset.
    */
   // Visitante (o rol sin acceso a Noticias): solo publicadas.
   // ADMIN / COMUNICACIONES con token: también los borradores y las desactivadas, para el panel.
@@ -54,14 +54,14 @@ export class NoticiasController {
 
   /** PATCH /api/noticias/:id — Edita, publica o reactiva una noticia (COMUNICACIONES y ADMIN). */
   @Patch(':id')
-  update(@Param('id', ParseMongoIdPipe) id: string, @Body() updateNoticiaDto: UpdateNoticiaDto) {
-    return this.noticiasService.update(id, updateNoticiaDto);
+  update(@Param('id', ParseMongoIdPipe) id: string, @Body() updateNoticiaDto: UpdateNoticiaDto, @CurrentUser() user: Auth) {
+    return this.noticiasService.update(id, updateNoticiaDto, user);
   }
 
   /** DELETE /api/noticias/:id — Desactiva la noticia (borrado lógico). Solo ADMIN. */
   @Roles(ValidRoles.admin)
   @Delete(':id')
-  remove(@Param('id', ParseMongoIdPipe) id: string) {
-    return this.noticiasService.remove(id);
+  remove(@Param('id', ParseMongoIdPipe) id: string, @CurrentUser() user: Auth) {
+    return this.noticiasService.remove(id, user);
   }
 }

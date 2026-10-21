@@ -28,4 +28,11 @@ export class FindNoticiasDto extends PaginationDto {
     @IsEnum(NoticiaCategoria)
     @IsOptional()
     categoria?: NoticiaCategoria;
+
+    // Solo para el panel: ?pendientes=true lista los que tienen datos por completar (ver "pendientes")
+    /** El servicio lo ignora si quien consulta no gestiona noticias. */
+    @ToBoolean()
+    @IsBoolean()
+    @IsOptional()
+    pendientes?: boolean;
 }

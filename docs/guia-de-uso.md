@@ -151,6 +151,39 @@ Los mismos `GET` del sitio, con token, aceptan:
 | Actividades | `GET /api/actividades?isActive=false` |
 | Noticias | `GET /api/noticias?publicado=false` (borradores) o `?isActive=false` (desactivadas) |
 
+### La pantalla Resumen
+**Un solo request** arma toda la pantalla: `GET /api/resumen` ([detalle de cada bloque](api.md#get-resumen)).
+
+| En pantalla | Campo de la respuesta |
+|---|---|
+| Fichas completas · 0 de 48 (y la barra) | `tarjetas.fichas.completas`, `.total`, `.porcentaje`, `.detalle` |
+| Mensajes sin leer · 3 · 4 en total | `tarjetas.mensajes.sinLeer`, `.total` |
+| Próximas actividades · 6 · 105 personas inscritas | `tarjetas.actividades.proximas`, `.inscritos` |
+| Noticias publicadas · 4 · 1 en borrador | `tarjetas.noticias.publicadas`, `.borradores` |
+| Por hacer (y el número del recuadro) | `porHacer.items`, `porHacer.total` |
+| Accesos rápidos | `accesosRapidos` (`titulo`, `icono`, `ruta`) |
+| Actividad reciente | `actividadReciente` (`fecha`, `texto`) |
+| Avance de fichas por distrito | `avanceDistritos.detalle` y `.distritos` (`distrito`, `iglesias`, `porcentaje`) |
+
+Un bloque en `null` significa que el rol no ve esa sección: no se dibuja. Para refrescar solo el "Por hacer" (por ejemplo, al volver de completar una ficha): `GET /api/resumen/por-hacer`.
+
+**El botón "Ir" del Por hacer** lleva a la `ruta` de cada tarjeta:
+
+| Tarjeta | `ruta` |
+|---|---|
+| Completar N fichas de iglesia | `iglesias?pendientes=true`: la lista de iglesias con datos faltantes |
+| Completar N actividades próximas | `actividades?pendientes=true&desde=<hoy>` |
+| Responder N mensajes | `mensajes?leido=false` |
+| Terminar el borrador de noticia | `noticias/<id>`: ese borrador |
+| Revisar N borradores más | `noticias?publicado=false` |
+
+Además, cada iglesia, actividad y noticia trae `pendientes` (ej. `["encargado", "telefono"]`), para marcar en la tabla del panel qué le falta a cada fila.
+
+### Mensajes del sitio
+- `GET /api/mensajes?leido=false` → los nuevos.
+- Al abrir uno: `PATCH /api/mensajes/:id` con `{ "leido": true }` (deja de contar en "sin leer").
+- Archivar: `DELETE /api/mensajes/:id` (ADMIN).
+
 ---
 
 ## El sitio web público
@@ -218,6 +251,13 @@ GET /api/actividades?desde=2026-10-20&limit=50
 | Comunicado oficial | diario |
 | Oración | corazón |
 | Historia | diario |
+
+### Formulario de contacto
+`POST /api/mensajes` sin token, con `nombre`, `email`, `mensaje` (y opcionales `telefono`, `asunto`). Responde `{ "message": "Mensaje recibido" }`; los errores de validación vienen como siempre (`400` con la lista de mensajes por campo).
+
+```js
+await api('/mensajes', { method: 'POST', body: { nombre, email, mensaje } });
+```
 
 ---
 
@@ -359,6 +399,51 @@ const { data } = await api(`/actividades?desde=${hoy}&limit=50`);
 const meses = agruparPorMes(data);
 ```
 
+### Recuadro "Por hacer"
+
+```js
+/**
+ * Dibuja las tarjetas del "Por hacer". Recibe `porHacer` de GET /api/resumen (o la respuesta
+ * de GET /api/resumen/por-hacer). `irA` es la función de navegación del panel.
+ */
+export function dibujarPorHacer({ total, items }, contenedor, irA) {
+  contenedor.querySelector('.contador').textContent = total;
+  contenedor.querySelector('.lista').replaceChildren(
+    ...items.map((tarea) => {
+      const fila = document.createElement('li');
+      // textContent (no innerHTML): el título de un borrador lo escribe un usuario
+      fila.innerHTML = `<span class="icono icono-${tarea.icono}"></span>
+        <div><strong></strong><small></small></div>
+        <button>Ir</button>`;
+      fila.querySelector('strong').textContent = tarea.titulo;
+      fila.querySelector('small').textContent = tarea.detalle;
+      // ruta = "iglesias?pendientes=true": la misma ruta del menú, con los filtros que
+      // la pantalla de destino le pasa tal cual a GET /api/iglesias
+      fila.querySelector('button').onclick = () => irA(`/${tarea.ruta}`);
+      return fila;
+    }),
+  );
+}
+```
+
+En la tabla de cada sección, `pendientes` sirve para marcar las filas incompletas:
+
+```js
+const nombres = {
+  direccion: 'dirección', reuniones: 'horario', encargado: 'pastor', email: 'correo', telefono: 'teléfono',
+  descripcion: 'descripción', lugar: 'lugar', imagen: 'imagen',
+};
+const aviso = (registro) => registro.pendientes.length ? `Falta: ${registro.pendientes.map((campo) => nombres[campo]).join(', ')}` : '';
+```
+
+### Actividad reciente
+
+```js
+// fecha viene en UTC: "20 oct" en hora de Chile
+const dia = (fecha) => new Date(fecha).toLocaleDateString('es-CL', { day: 'numeric', month: 'short', timeZone: 'America/Santiago' });
+const lineas = resumen.actividadReciente.map(({ fecha, texto }) => `${dia(fecha)}  ${texto}`);
+```
+
 ### Agregar a Google Calendar
 
 ```js
@@ -391,6 +476,12 @@ function enlaceGoogleCalendar(a) {
 | Quitar la ubicación de una iglesia | `PATCH /api/iglesias/:id` con `{ "lat": null, "lng": null }` |
 | Cambiar los roles de alguien | `PATCH /api/auth/:id` con `{ "roles": ["DISTRITO"] }` (reemplaza todos) |
 | Quitarle el acceso a alguien al instante | `DELETE /api/auth/:id` |
+| Ver qué iglesias tienen la ficha incompleta | `GET /api/iglesias?pendientes=true` (con token del panel) |
+| Cargar los inscritos de una actividad | `PATCH /api/actividades/:id` con `{ "inscritos": 60 }` |
+| Marcar un mensaje como leído | `PATCH /api/mensajes/:id` con `{ "leido": true }` |
+| Cambiar los accesos rápidos del Resumen | `ACCESOS_RAPIDOS` en `src/auth/menu/menu.config.ts` |
+| Cambiar qué datos cuentan como "ficha completa" | `CAMPOS_FICHA_*` en la entidad (`iglesia.entity.ts`, `actividad.entity.ts`, `noticia.entity.ts`) |
+| Darle permiso de edición de una sección a otro rol | Agregar el rol en `editan` de `menu.config.ts`: cambia los `@Roles` de POST/PATCH **y** el "Por hacer" |
 | Desbloquear una cuenta (3 intentos fallidos) | `PATCH /api/auth/:id` con `{ "unblock": true }` |
 | Cambiar la contraseña de alguien | `PATCH /api/auth/:id` con `{ "password": "nueva-clave" }` |
 | Agregar una categoría de noticias | Sumarla en `src/noticias/interfaces/categoria.enum.ts` (y su ícono en el front) |
