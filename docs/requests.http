@@ -1,6 +1,7 @@
 # Requests de la API Iglesia para la extensión REST Client de VS Code.
-# 1) Cambia @email y @password. 2) "Send Request" en Login. 3) Los demás usan su token.
-# Los "Crear ..." tienen nombre: los Ver/Editar/Desactivar usan el _id que devolvieron.
+# Son los mismos de docs/iglesia.postman_collection.json, en el mismo orden.
+# 1) Cambia @email y @password (un usuario ADMIN). 2) "Send Request" en Login. 3) Los demás usan su token.
+# Los "Crear ..." y "Mensajes · Listar todos" tienen nombre: los Ver/Editar/Desactivar usan el _id que devolvieron.
 # Documentación completa: docs/api.md
 
 @baseUrl = http://localhost:3500/api
@@ -10,9 +11,8 @@
 @usuarioId = {{registrarUsuario.response.body.user._id}}
 @iglesiaId = {{crearIglesia.response.body._id}}
 @actividadId = {{crearActividad.response.body._id}}
-# Pon aquí el _id de un mensaje (GET /mensajes) para marcarlo o archivarlo
-@mensajeId = 
 @noticiaId = {{crearBorrador.response.body._id}}
+@mensajeId = {{listarMensajes.response.body.$.data[0]._id}}
 
 ######## AUTH ########
 
@@ -58,6 +58,18 @@ Authorization: Bearer {{token}}
 # Solo ADMIN.
 GET {{baseUrl}}/auth/{{usuarioId}}
 Authorization: Bearer {{token}}
+
+
+### Auth · Editar datos de usuario
+# Solo ADMIN. Solo cambia los campos enviados; nombre y correo se guardan en minúsculas. Un correo ya usado por otro usuario responde 400.
+PATCH {{baseUrl}}/auth/{{usuarioId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "José Luis",
+  "email": "jose.luis@iglesia.cl"
+}
 
 
 ### Auth · Asignar roles
@@ -132,7 +144,7 @@ Authorization: Bearer {{token}}
 
 
 ### Iglesias · Fichas incompletas (panel)
-# Con token de ADMIN, DISTRITO o IGLESIA: solo las iglesias sin horario, dirección o correo.
+# Con token de ADMIN, DISTRITO o IGLESIA: solo las iglesias sin horario, dirección o correo. Cada una trae "pendientes" con lo que le falta. Sin token se ignora.
 GET {{baseUrl}}/iglesias?pendientes=true
 Authorization: Bearer {{token}}
 
@@ -143,7 +155,7 @@ GET {{baseUrl}}/iglesias/distritos
 
 
 ### Iglesias · Crear iglesia
-# DISTRITO o ADMIN. lat y lng van juntas. Guarda el _id en iglesiaId.
+# DISTRITO o ADMIN (hoy abierto, ver api.md). lat y lng van juntas. Con los 5 datos (dirección, horario, pastor, correo y teléfono) la ficha queda completa: "pendientes": []. Guarda el _id en iglesiaId.
 # @name crearIglesia
 POST {{baseUrl}}/iglesias
 Authorization: Bearer {{token}}
@@ -156,6 +168,7 @@ Content-Type: application/json
   "reuniones": "Domingo 11:00, Miércoles 19:30",
   "encargado": "Pastor Juan Pérez",
   "email": "contacto@iglesiatemuco.cl",
+  "telefono": "+56 45 221 3344",
   "lat": -38.7359,
   "lng": -72.5904
 }
@@ -174,6 +187,17 @@ Content-Type: application/json
 
 {
   "reuniones": "Domingo 10:30"
+}
+
+
+### Iglesias · Completar ficha (teléfono)
+# DISTRITO o ADMIN. Completa un dato faltante: la respuesta trae "pendientes" actualizado.
+PATCH {{baseUrl}}/iglesias/{{iglesiaId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "telefono": "+56 9 1234 5678"
 }
 
 
@@ -218,9 +242,20 @@ GET {{baseUrl}}/actividades?desde=2026-10-01&limit=50
 GET {{baseUrl}}/actividades?distrito=nacional
 
 
+### Actividades · Rango de fechas
+# Público. Con solo el día, hasta incluye todo ese día en hora de Chile.
+GET {{baseUrl}}/actividades?desde=2026-10-01&hasta=2026-12-31
+
+
 ### Actividades · Listar desactivadas (panel)
 # Con token de un rol que ve Actividades.
 GET {{baseUrl}}/actividades?isActive=false
+Authorization: Bearer {{token}}
+
+
+### Actividades · Por completar (panel)
+# Panel: actividades próximas sin descripción o lugar (el botón "Ir" del Por hacer). Sin token se ignora pendientes.
+GET {{baseUrl}}/actividades?pendientes=true&desde=2026-10-01
 Authorization: Bearer {{token}}
 
 
@@ -238,7 +273,8 @@ Content-Type: application/json
   "fecha_fin": "2026-10-25T18:00:00-03:00",
   "lugar": "Temuco",
   "distrito": "Araucanía",
-  "inscripcion_url": "https://forms.gle/retiro2026"
+  "inscripcion_url": "https://forms.gle/retiro2026",
+  "inscritos": 35
 }
 
 
@@ -283,6 +319,17 @@ Content-Type: application/json
 }
 
 
+### Actividades · Cargar inscritos
+# COMUNICACIONES, DISTRITO o ADMIN. El Resumen suma los inscritos de las próximas actividades.
+PATCH {{baseUrl}}/actividades/{{actividadId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "inscritos": 60
+}
+
+
 ### Actividades · Desactivar actividad
 # Solo ADMIN.
 DELETE {{baseUrl}}/actividades/{{actividadId}}
@@ -312,9 +359,26 @@ GET {{baseUrl}}/noticias?limit=9
 GET {{baseUrl}}/noticias?categoria=Misiones
 
 
+### Noticias · Buscar por título
+# Público. Sin distinguir tildes ni mayúsculas.
+GET {{baseUrl}}/noticias?search=oracion
+
+
 ### Noticias · Borradores (panel)
 # Con token de ADMIN o COMUNICACIONES.
 GET {{baseUrl}}/noticias?publicado=false
+Authorization: Bearer {{token}}
+
+
+### Noticias · Desactivadas (panel)
+# ADMIN o COMUNICACIONES: las desactivadas, para reactivarlas.
+GET {{baseUrl}}/noticias?isActive=false
+Authorization: Bearer {{token}}
+
+
+### Noticias · Sin imagen (panel)
+# ADMIN o COMUNICACIONES: noticias con "pendientes": ["imagen"].
+GET {{baseUrl}}/noticias?pendientes=true
 Authorization: Bearer {{token}}
 
 
@@ -395,27 +459,49 @@ Content-Type: application/json
 }
 
 
-######## SALUD ########
+######## MENSAJES ########
 
 ### Mensajes · Enviar mensaje (sitio)
-# Público: el formulario de contacto del sitio.
+# Público, sin token: el formulario de contacto del sitio. Solo nombre, email y mensaje son obligatorios. Responde { message: "Mensaje recibido" }.
 POST {{baseUrl}}/mensajes
 Content-Type: application/json
 
 {
-  "nombre": "Rosa",
+  "nombre": "Rosa Pérez",
   "email": "rosa@correo.cl",
-  "mensaje": "¿A qué hora es el culto?"
+  "telefono": "+56 9 8765 4321",
+  "asunto": "Horario",
+  "mensaje": "¿A qué hora es el culto del domingo?"
 }
 
 
+### Mensajes · Listar todos
+# Roles que ven Mensajes en el menú. El más nuevo primero. Guarda el _id del primero en mensajeId.
+# @name listarMensajes
+GET {{baseUrl}}/mensajes
+Authorization: Bearer {{token}}
+
+
 ### Mensajes · Listar sin leer
-# Roles que ven Mensajes en el menú.
+# Los que cuentan en "Mensajes sin leer". Guarda el _id del primero en mensajeId.
 GET {{baseUrl}}/mensajes?leido=false
 Authorization: Bearer {{token}}
 
 
+### Mensajes · Buscar
+# Busca en nombre, correo y asunto.
+GET {{baseUrl}}/mensajes?search=rosa
+Authorization: Bearer {{token}}
+
+
+### Mensajes · Ver mensaje
+# Un mensaje (también archivado).
+GET {{baseUrl}}/mensajes/{{mensajeId}}
+Authorization: Bearer {{token}}
+
+
 ### Mensajes · Marcar leído
+# Deja de contar en "sin leer". Lo normal es llamarlo al abrir el mensaje en el panel.
 PATCH {{baseUrl}}/mensajes/{{mensajeId}}
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -425,25 +511,56 @@ Content-Type: application/json
 }
 
 
+### Mensajes · Marcar como no leído
+# Vuelve a contar como nuevo.
+PATCH {{baseUrl}}/mensajes/{{mensajeId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "leido": false
+}
+
+
 ### Mensajes · Archivar mensaje
-# Solo ADMIN.
+# Solo ADMIN. Borrado lógico.
 DELETE {{baseUrl}}/mensajes/{{mensajeId}}
 Authorization: Bearer {{token}}
 
 
+### Mensajes · Listar archivados
+# Los archivados.
+GET {{baseUrl}}/mensajes?isActive=false
+Authorization: Bearer {{token}}
+
+
+### Mensajes · Recuperar mensaje
+# Saca un mensaje del archivo.
+PATCH {{baseUrl}}/mensajes/{{mensajeId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "isActive": true
+}
+
+
+######## RESUMEN ########
+
 ### Resumen · Pantalla completa
-# Cualquier usuario con sesión. Todos los bloques de la pantalla Resumen, según el rol.
+# Cualquier usuario con sesión. Toda la pantalla Resumen: tarjetas (fichas, mensajes, actividades, noticias), Por hacer, accesos rápidos, actividad reciente y avance por distrito. Lo que el rol no ve llega en null.
 GET {{baseUrl}}/resumen
 Authorization: Bearer {{token}}
 
 
 ### Resumen · Por hacer
-# Cualquier usuario con sesión. Las tarjetas del recuadro "Por hacer" según el rol.
+# Cualquier usuario con sesión. Las tarjetas del recuadro "Por hacer" según el rol: fichas de iglesia y actividades por completar, borradores de noticias.
 GET {{baseUrl}}/resumen/por-hacer
 Authorization: Bearer {{token}}
 
 
+######## SALUD ########
+
 ### Salud · API arriba
 # Responde "Hello World!".
 GET {{baseUrl}}
-

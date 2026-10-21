@@ -22,7 +22,18 @@ Con la API corriendo (`yarn start:dev`), hay tres formas de probarla sin escribi
 1. En Postman: **Import** → elige [`docs/iglesia.postman_collection.json`](iglesia.postman_collection.json).
 2. Abre la colección → pestaña **Variables** → revisa `baseUrl` (`http://localhost:3500/api`) y pon tu correo y contraseña en `email` y `password`.
 3. Ejecuta **Auth → Login**. El token queda guardado solo en la variable `token` y lo usan todos los demás requests.
-4. Al crear una iglesia, actividad o noticia, su `_id` también se guarda (`iglesiaId`, `actividadId`, `noticiaId`), así que "Ver", "Editar" y "Desactivar" funcionan sin copiar ids.
+4. Al crear una iglesia, actividad o noticia, su `_id` también se guarda (`iglesiaId`, `actividadId`, `noticiaId`), y "Mensajes → Listar todos" guarda el del primer mensaje (`mensajeId`), así que "Ver", "Editar" y "Desactivar" funcionan sin copiar ids.
+5. Para probar todo de una vez: clic derecho en la colección → **Run collection**. Los 62 requests están en el orden en que se pueden correr seguidos (con un usuario ADMIN en `email` / `password`).
+
+| Carpeta | Qué trae |
+|---|---|
+| Auth (11) | Login, registro, mi usuario, y la gestión de usuarios del ADMIN (roles, clave, desactivar, desbloquear) |
+| Iglesias (12) | Listados del sitio y del panel (desactivadas, fichas incompletas), distritos, crear, editar, completar ficha |
+| Actividades (13) | Próximas, nacionales, rango de fechas, por completar, crear, editar, inscritos, desactivar |
+| Noticias (13) | Listado, categoría, búsqueda, borradores, desactivadas, sin imagen, crear, publicar, editar |
+| Mensajes (10) | Formulario del sitio (sin token), listar, buscar, ver, marcar leído / no leído, archivar, recuperar |
+| Resumen (2) | La pantalla Resumen completa y solo el "Por hacer" |
+| Salud (1) | `GET /api` |
 
 ### VS Code
 1. Instala la extensión **REST Client** (de Huachao Mao).

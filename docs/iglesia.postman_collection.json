@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "API Iglesia",
-    "description": "Todos los endpoints de la API Iglesia. 1) Ajusta baseUrl, email y password en Variables. 2) Ejecuta Auth → Login: el token se guarda solo. 3) Los \"Crear ...\" guardan el _id para usarlo en Ver/Editar/Desactivar. Documentación completa: docs/api.md",
+    "description": "Todos los endpoints de la API Iglesia, en el orden en que conviene probarlos. 1) Ajusta baseUrl, email y password en Variables (un usuario ADMIN). 2) Ejecuta Auth → Login: el token se guarda solo y lo usan todos los requests (los públicos van sin token). 3) Los \"Crear ...\" guardan el _id (iglesiaId, actividadId, noticiaId) y \"Listar\" de Mensajes guarda mensajeId, para usarlos en Ver/Editar/Desactivar. También puedes correr la colección completa con el Runner. Documentación: docs/api.md",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -204,6 +204,38 @@
               ]
             },
             "description": "Solo ADMIN."
+          }
+        },
+        {
+          "name": "Editar datos de usuario",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/{{usuarioId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "{{usuarioId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"José Luis\",\n  \"email\": \"jose.luis@iglesia.cl\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Solo ADMIN. Solo cambia los campos enviados; nombre y correo se guardan en minúsculas. Un correo ya usado por otro usuario responde 400."
           }
         },
         {
@@ -511,7 +543,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"distrito\": \"Araucanía\",\n  \"name\": \"Iglesia Bautista de Temuco\",\n  \"direccion\": \"Av. Alemania 0450, Temuco\",\n  \"reuniones\": \"Domingo 11:00, Miércoles 19:30\",\n  \"encargado\": \"Pastor Juan Pérez\",\n  \"email\": \"contacto@iglesiatemuco.cl\",\n  \"lat\": -38.7359,\n  \"lng\": -72.5904\n}",
+              "raw": "{\n  \"distrito\": \"Araucanía\",\n  \"name\": \"Iglesia Bautista de Temuco\",\n  \"direccion\": \"Av. Alemania 0450, Temuco\",\n  \"reuniones\": \"Domingo 11:00, Miércoles 19:30\",\n  \"encargado\": \"Pastor Juan Pérez\",\n  \"email\": \"contacto@iglesiatemuco.cl\",\n  \"telefono\": \"+56 45 221 3344\",\n  \"lat\": -38.7359,\n  \"lng\": -72.5904\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -527,7 +559,7 @@
                 "iglesias"
               ]
             },
-            "description": "DISTRITO o ADMIN. lat y lng van juntas. Guarda el _id en iglesiaId."
+            "description": "DISTRITO o ADMIN (hoy abierto, ver api.md). lat y lng van juntas. Con los 5 datos (dirección, horario, pastor, correo y teléfono) la ficha queda completa: \"pendientes\": []. Guarda el _id en iglesiaId."
           }
         },
         {
@@ -581,6 +613,38 @@
               ]
             },
             "description": "DISTRITO o ADMIN. Solo cambia lo enviado."
+          }
+        },
+        {
+          "name": "Completar ficha (teléfono)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/iglesias/{{iglesiaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "iglesias",
+                "{{iglesiaId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"telefono\": \"+56 9 1234 5678\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "DISTRITO o ADMIN. Completa un dato faltante: la respuesta trae \"pendientes\" actualizado."
           }
         },
         {
@@ -728,6 +792,36 @@
           }
         },
         {
+          "name": "Rango de fechas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/actividades?desde=2026-10-01&hasta=2026-12-31",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actividades"
+              ],
+              "query": [
+                {
+                  "key": "desde",
+                  "value": "2026-10-01"
+                },
+                {
+                  "key": "hasta",
+                  "value": "2026-12-31"
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Público. Con solo el día, hasta incluye todo ese día en hora de Chile."
+          }
+        },
+        {
           "name": "Listar desactivadas (panel)",
           "request": {
             "method": "GET",
@@ -748,6 +842,33 @@
               ]
             },
             "description": "Con token de un rol que ve Actividades."
+          }
+        },
+        {
+          "name": "Por completar (panel)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/actividades?pendientes=true&desde=2026-10-01",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actividades"
+              ],
+              "query": [
+                {
+                  "key": "pendientes",
+                  "value": "true"
+                },
+                {
+                  "key": "desde",
+                  "value": "2026-10-01"
+                }
+              ]
+            },
+            "description": "Panel: actividades próximas sin descripción o lugar (el botón \"Ir\" del Por hacer). Sin token se ignora pendientes."
           }
         },
         {
@@ -775,7 +896,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"titulo\": \"Retiro de jóvenes\",\n  \"descripcion\": \"Dos días de alabanza, enseñanza y convivencia para jóvenes de 15 a 30 años.\",\n  \"fecha_inicio\": \"2026-10-24T09:00:00-03:00\",\n  \"fecha_fin\": \"2026-10-25T18:00:00-03:00\",\n  \"lugar\": \"Temuco\",\n  \"distrito\": \"Araucanía\",\n  \"inscripcion_url\": \"https://forms.gle/retiro2026\"\n}",
+              "raw": "{\n  \"titulo\": \"Retiro de jóvenes\",\n  \"descripcion\": \"Dos días de alabanza, enseñanza y convivencia para jóvenes de 15 a 30 años.\",\n  \"fecha_inicio\": \"2026-10-24T09:00:00-03:00\",\n  \"fecha_fin\": \"2026-10-25T18:00:00-03:00\",\n  \"lugar\": \"Temuco\",\n  \"distrito\": \"Araucanía\",\n  \"inscripcion_url\": \"https://forms.gle/retiro2026\",\n  \"inscritos\": 35\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -911,6 +1032,38 @@
           }
         },
         {
+          "name": "Cargar inscritos",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/actividades/{{actividadId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actividades",
+                "{{actividadId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"inscritos\": 60\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "COMUNICACIONES, DISTRITO o ADMIN. El Resumen suma los inscritos de las próximas actividades."
+          }
+        },
+        {
           "name": "Desactivar actividad",
           "request": {
             "method": "DELETE",
@@ -1019,6 +1172,32 @@
           }
         },
         {
+          "name": "Buscar por título",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/noticias?search=oracion",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "noticias"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "oracion"
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Público. Sin distinguir tildes ni mayúsculas."
+          }
+        },
+        {
           "name": "Borradores (panel)",
           "request": {
             "method": "GET",
@@ -1039,6 +1218,52 @@
               ]
             },
             "description": "Con token de ADMIN o COMUNICACIONES."
+          }
+        },
+        {
+          "name": "Desactivadas (panel)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/noticias?isActive=false",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "noticias"
+              ],
+              "query": [
+                {
+                  "key": "isActive",
+                  "value": "false"
+                }
+              ]
+            },
+            "description": "ADMIN o COMUNICACIONES: las desactivadas, para reactivarlas."
+          }
+        },
+        {
+          "name": "Sin imagen (panel)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/noticias?pendientes=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "noticias"
+              ],
+              "query": [
+                {
+                  "key": "pendientes",
+                  "value": "true"
+                }
+              ]
+            },
+            "description": "ADMIN o COMUNICACIONES: noticias con \"pendientes\": [\"imagen\"]."
           }
         },
         {
@@ -1272,20 +1497,66 @@
                 "mensajes"
               ]
             },
-            "description": "Público: el formulario de contacto del sitio. Responde { message: \"Mensaje recibido\" }.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"nombre\": \"Rosa\",\n  \"email\": \"rosa@correo.cl\",\n  \"mensaje\": \"¿A qué hora es el culto?\"\n}",
+              "raw": "{\n  \"nombre\": \"Rosa Pérez\",\n  \"email\": \"rosa@correo.cl\",\n  \"telefono\": \"+56 9 8765 4321\",\n  \"asunto\": \"Horario\",\n  \"mensaje\": \"¿A qué hora es el culto del domingo?\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
                 }
               }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Público, sin token: el formulario de contacto del sitio. Solo nombre, email y mensaje son obligatorios. Responde { message: \"Mensaje recibido\" }."
+          }
+        },
+        {
+          "name": "Listar todos",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const r = pm.response.json();",
+                  "const id = r.data && r.data[0] && r.data[0]._id;",
+                  "if (id) pm.collectionVariables.set(\"mensajeId\", id);"
+                ]
+              }
             }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/mensajes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "mensajes"
+              ]
+            },
+            "description": "Roles que ven Mensajes en el menú. El más nuevo primero. Guarda el _id del primero en mensajeId."
           }
         },
         {
           "name": "Listar sin leer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const r = pm.response.json();",
+                  "const id = r.data && r.data[0] && r.data[0]._id;",
+                  "if (id) pm.collectionVariables.set(\"mensajeId\", id);"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [],
@@ -1304,7 +1575,48 @@
                 }
               ]
             },
-            "description": "Roles que ven Mensajes en el menú. El más nuevo primero."
+            "description": "Los que cuentan en \"Mensajes sin leer\". Guarda el _id del primero en mensajeId."
+          }
+        },
+        {
+          "name": "Buscar",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/mensajes?search=rosa",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "mensajes"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "rosa"
+                }
+              ]
+            },
+            "description": "Busca en nombre, correo y asunto."
+          }
+        },
+        {
+          "name": "Ver mensaje",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/mensajes/{{mensajeId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "mensajes",
+                "{{mensajeId}}"
+              ]
+            },
+            "description": "Un mensaje (también archivado)."
           }
         },
         {
@@ -1327,7 +1639,6 @@
                 "{{mensajeId}}"
               ]
             },
-            "description": "Pon el _id de un mensaje en la variable mensajeId.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"leido\": true\n}",
@@ -1336,7 +1647,40 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "Deja de contar en \"sin leer\". Lo normal es llamarlo al abrir el mensaje en el panel."
+          }
+        },
+        {
+          "name": "Marcar como no leído",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/mensajes/{{mensajeId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "mensajes",
+                "{{mensajeId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"leido\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Vuelve a contar como nuevo."
           }
         },
         {
@@ -1355,6 +1699,61 @@
               ]
             },
             "description": "Solo ADMIN. Borrado lógico."
+          }
+        },
+        {
+          "name": "Listar archivados",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/mensajes?isActive=false",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "mensajes"
+              ],
+              "query": [
+                {
+                  "key": "isActive",
+                  "value": "false"
+                }
+              ]
+            },
+            "description": "Los archivados."
+          }
+        },
+        {
+          "name": "Recuperar mensaje",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/mensajes/{{mensajeId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "mensajes",
+                "{{mensajeId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isActive\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Saca un mensaje del archivo."
           }
         }
       ]
@@ -1376,7 +1775,7 @@
                 "resumen"
               ]
             },
-            "description": "Cualquier usuario con sesión. Tarjetas, Por hacer, accesos rápidos, actividad reciente y avance por distrito, según el rol."
+            "description": "Cualquier usuario con sesión. Toda la pantalla Resumen: tarjetas (fichas, mensajes, actividades, noticias), Por hacer, accesos rápidos, actividad reciente y avance por distrito. Lo que el rol no ve llega en null."
           }
         },
         {
