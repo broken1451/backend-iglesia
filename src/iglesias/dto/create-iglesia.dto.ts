@@ -1,5 +1,6 @@
-import { IsEmail, IsLatitude, IsLongitude, IsNotEmpty, IsOptional, IsString, Matches, MaxLength } from "class-validator";
+import { IsEmail, IsIn, IsLatitude, IsLongitude, IsNotEmpty, IsOptional, IsString, Matches, MaxLength } from "class-validator";
 import { NormalizeSpaces } from "../../common/transforms/normalize-spaces.transform.js";
+import { DISTRITOS } from "../distritos.js";
 
 /**
  * Body de POST /api/iglesias.
@@ -10,11 +11,10 @@ import { NormalizeSpaces } from "../../common/transforms/normalize-spaces.transf
  */
 export class CreateIglesiaDto {
 
-    /** Distrito al que pertenece. Obligatorio. */
+    /** Distrito al que pertenece: uno de la lista fija (el selector del formulario). Obligatorio. */
     @NormalizeSpaces()
     @IsString()
-    @IsNotEmpty()
-    @MaxLength(100)
+    @IsIn(DISTRITOS, { message: `distrito must be one of: ${DISTRITOS.join(', ')}` })
     distrito: string;
 
     /** Nombre. Obligatorio y único dentro del distrito. */
@@ -30,6 +30,13 @@ export class CreateIglesiaDto {
     @IsOptional()
     @MaxLength(250)
     direccion?: string;
+
+    /** Comuna (el campo "Comuna" del formulario). */
+    @NormalizeSpaces()
+    @IsString()
+    @IsOptional()
+    @MaxLength(100)
+    comuna?: string;
 
     /** Horarios de reunión, texto libre. No se normalizan los espacios para respetar el formato. */
     @IsString()

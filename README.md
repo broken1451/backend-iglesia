@@ -13,7 +13,7 @@ Hecha con **NestJS 12**, **MongoDB** (Mongoose) y los módulos oficiales `@nestj
 | [docs/seguridad.md](docs/seguridad.md) | Login, tokens, roles, menú y quién puede hacer qué (y por qué) |
 | [docs/correo.md](docs/correo.md) | Envío de correos: configuración (desarrollo y SMTP), plantillas y cómo agregar un correo nuevo |
 | [docs/arquitectura.md](docs/arquitectura.md) | Estructura de carpetas, el camino de un request y las decisiones de diseño |
-| [docs/iglesia.postman_collection.json](docs/iglesia.postman_collection.json) | Colección de Postman con los 62 requests listos (el login guarda el token solo) |
+| [docs/iglesia.postman_collection.json](docs/iglesia.postman_collection.json) | Colección de Postman con los 64 requests listos (el login guarda el token solo) |
 | [docs/requests.http](docs/requests.http) | Los mismos requests para la extensión REST Client de VS Code |
 
 ## Puesta en marcha

@@ -5,7 +5,7 @@ import { CreateNoticiaDto } from './dto/create-noticia.dto.js';
 import { UpdateNoticiaDto } from './dto/update-noticia.dto.js';
 import { FindNoticiasDto } from './dto/find-noticias.dto.js';
 import { CAMPOS_FICHA_NOTICIA, Noticia } from './entities/noticia.entity.js';
-import { faltaAlguno } from '../common/utils/pendientes.utils.js';
+import { faltaAlguno, tieneTodos } from '../common/utils/pendientes.utils.js';
 import { HistorialService, accionAlEditar } from '../historial/historial.service.js';
 import { AccionHistorial } from '../historial/entities/historial.entity.js';
 import { Auth } from '../auth/entities/auth.entity.js';
@@ -70,8 +70,10 @@ export class NoticiasService {
     else if (publicado !== undefined) filter.publicado = publicado;
     if (categoria) filter.categoria = categoria;
     if (search) filter.titulo = containsRegex(search);
-    // Noticias incompletas (sin imagen), solo para el panel
-    if (pendientes && verBorradores) Object.assign(filter, faltaAlguno(CAMPOS_FICHA_NOTICIA));
+    // Solo panel: true = incompletas (sin imagen), false = completas
+    if (pendientes !== undefined && verBorradores) {
+      Object.assign(filter, pendientes ? faltaAlguno(CAMPOS_FICHA_NOTICIA) : tieneTodos(CAMPOS_FICHA_NOTICIA));
+    }
 
     // La página y el total se piden a la vez para no esperar dos viajes a Mongo
     const [data, total] = await Promise.all([

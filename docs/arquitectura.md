@@ -149,10 +149,11 @@ Mongo guarda las fechas en UTC y la API las devuelve así (`2026-10-31T22:00:00.
 
 ### Iglesias
 El directorio que muestra el sitio.
-- **Campos:** `distrito`, `name`, `direccion`, `reuniones`, `encargado`, `email`, `lat`, `lng`.
+- **Campos** (los del formulario "Agregar iglesia"): `name`, `comuna`, `distrito`, `direccion`, `reuniones`, `encargado`, `email`, `telefono`, `lat`, `lng`. Además, calculados al responder: `pendientes` y `ficha`.
 - **Nombre único por distrito** (sin distinguir mayúsculas): puede haber una "Iglesia Central" en dos distritos distintos, pero no dos en el mismo.
+- **Distrito de una lista fija** (`iglesias/distritos.ts`): Norte, Metropolitano, Valle Central, Biobío, Araucanía, Los Ríos. Crear o editar con otro responde 400. **Por qué:** con texto libre, "Araucania" y "Araucanía" serían dos distritos distintos en el filtro y en el avance. La lista también define el orden (de norte a sur) de `GET /iglesias/distritos` y del avance por distrito; un distrito antiguo que no esté en la lista va al final.
 - **Coordenadas en par:** `lat` y `lng` van juntas o ninguna. Un punto con una sola coordenada rompería el mapa. La regla se valida contra lo ya guardado, así un PATCH tampoco puede dejar media coordenada.
-- **`GET /iglesias/distritos`:** lista de distritos con cuántas iglesias activas tiene cada uno, para el filtro del sitio. Va declarado antes que `/:id` porque si no, Nest tomaría "distritos" como un id.
+- **`GET /iglesias/distritos`:** la lista fija con cuántas iglesias activas tiene cada distrito: llena el selector del formulario del panel y el filtro del sitio. Va declarado antes que `/:id` porque si no, Nest tomaría "distritos" como un id.
 
 ### Actividades
 El calendario del sitio. Los campos salen directamente del diseño de la tarjeta:
@@ -197,8 +198,8 @@ Los servicios de iglesias, actividades y noticias **anotan cada cambio** con `Hi
 El recuadro **Por hacer** del panel (pantalla Resumen) muestra lo que falta completar. Se arma en tres capas:
 
 1. **Cada entidad declara su "ficha completa"**: `CAMPOS_FICHA_IGLESIA = ['direccion', 'reuniones', 'encargado', 'email', 'telefono']`, `CAMPOS_FICHA_ACTIVIDAD = ['descripcion', 'lugar']`, `CAMPOS_FICHA_NOTICIA = ['imagen']`.
-2. **Campo virtual `pendientes`** en cada registro: Mongoose lo calcula al responder (`["email"]`, o `[]` si está completo). **Por qué virtual:** no se guarda, así nunca queda desactualizado al editar. Como el JSON ahora incluye virtuales, los esquemas usan `id: false` para no repetir `_id` como `id`.
-3. **Filtro `?pendientes=true`** en los listados (solo panel) y **`GET /api/resumen/por-hacer`**: `ResumenService` pide a cada servicio sus conteos (`contarIncompletas()`, `borradores()`) y arma las tarjetas.
+2. **Campos virtuales** que Mongoose calcula al responder: `pendientes` en cada registro (`["email"]`, o `[]` si está completo) y, en iglesias, `ficha` (`{ completos: 0, total: 5, porcentaje, completa, estado: "Faltan 5" }`) para las columnas Ficha y Estado de la tabla del panel. **Por qué virtuales:** no se guardan, así nunca quedan desactualizados al editar. Como el JSON ahora incluye virtuales, los esquemas usan `id: false` para no repetir `_id` como `id`.
+3. **Filtro `?pendientes`** en los listados (solo panel; `true` = incompletos, `false` = completos) y **`GET /api/resumen/por-hacer`**: `ResumenService` pide a cada servicio sus conteos (`contarIncompletas()`, `borradores()`) y arma las tarjetas.
 
 **Quién ve qué:** `puedeEditar()` revisa `editan` del menú. Así, a un IGLESIA no se le propone "Completar fichas de iglesia" si la API le respondería 403 al intentarlo. Para agregar un tipo de tarea nuevo (devocional, cambios por aprobar) basta un método más en `ResumenService`.
 

@@ -29,7 +29,7 @@ export class FindNoticiasDto extends PaginationDto {
     @IsOptional()
     categoria?: NoticiaCategoria;
 
-    // Solo para el panel: ?pendientes=true lista los que tienen datos por completar (ver "pendientes")
+    // Solo para el panel: ?pendientes=true lista los incompletos (ver "pendientes"); ?pendientes=false, los completos
     /** El servicio lo ignora si quien consulta no gestiona noticias. */
     @ToBoolean()
     @IsBoolean()

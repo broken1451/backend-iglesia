@@ -5,7 +5,8 @@ import { CreateIglesiaDto } from './dto/create-iglesia.dto.js';
 import { UpdateIglesiaDto } from './dto/update-iglesia.dto.js';
 import { FindIglesiasDto } from './dto/find-iglesias.dto.js';
 import { CAMPOS_FICHA_IGLESIA, Iglesia } from './entities/iglesia.entity.js';
-import { faltaAlguno } from '../common/utils/pendientes.utils.js';
+import { faltaAlguno, tieneTodos } from '../common/utils/pendientes.utils.js';
+import { ordenarPorDistrito } from './distritos.js';
 import { HistorialService, accionAlEditar } from '../historial/historial.service.js';
 import { AccionHistorial } from '../historial/entities/historial.entity.js';
 import type { Auth } from '../auth/entities/auth.entity.js';
@@ -46,7 +47,8 @@ export class IglesiasService {
   /**
    * Lista paginada de iglesias, ordenada por distrito y luego por nombre.
    *
-   * @param query        filtros: distrito (exacto), search (en el nombre), isActive, pendientes, limit, offset.
+   * @param query        filtros: distrito (exacto), search (en el nombre o la comuna), isActive,
+   *                     pendientes (true = fichas incompletas, false = completas), limit, offset.
    *                     distrito y search no distinguen mayúsculas ni tildes.
    * @param verInactivas true solo para roles que gestionan iglesias. Si es false, siempre
    *                     devuelve solo activas aunque se pida ?isActive=false; así un visitante
@@ -57,9 +59,14 @@ export class IglesiasService {
     // Quien no gestiona iglesias solo ve las activas, pida lo que pida en ?isActive=
     const filter: QueryFilter<Iglesia> = { isActive: verInactivas ? (isActive ?? true) : true };
     if (distrito) filter.distrito = equalsRegex(distrito);
-    if (search) filter.name = containsRegex(search);
-    // Fichas incompletas, para el botón "Ir" del Por hacer (solo panel)
-    if (pendientes && verInactivas) Object.assign(filter, faltaAlguno(CAMPOS_FICHA_IGLESIA));
+    // Condiciones con $or / $and propios van en una lista $and, para que una no pise a la otra
+    const condiciones: QueryFilter<Iglesia>[] = [];
+    if (search) condiciones.push({ $or: [{ name: containsRegex(search) }, { comuna: containsRegex(search) }] });
+    // Estado de la ficha (solo panel): true = incompletas (botón "Ir" del Por hacer), false = completas
+    if (pendientes !== undefined && verInactivas) {
+      condiciones.push(pendientes ? faltaAlguno(CAMPOS_FICHA_IGLESIA) : tieneTodos(CAMPOS_FICHA_IGLESIA));
+    }
+    if (condiciones.length) filter.$and = condiciones;
 
     // La página y el total se piden a la vez para no esperar dos viajes a Mongo
     const [data, total] = await Promise.all([
@@ -70,20 +77,23 @@ export class IglesiasService {
   }
 
   /**
-   * Distritos que tienen al menos una iglesia activa, con cuántas tiene cada uno.
-   * Lo usa el filtro de distritos del sitio, sin tener que descargar todas las iglesias.
+   * Los distritos de la lista fija con cuántas iglesias activas tiene cada uno.
+   * - El selector "Distrito" del formulario del panel usa la lista completa.
+   * - El filtro del sitio puede ocultar los de total 0.
+   * Si en la base hay distritos fuera de la lista (datos antiguos), van al final.
    *
-   * @returns [{ distrito: "Araucanía", total: 12 }, ...] en orden alfabético español
+   * @returns [{ distrito: "Norte", total: 2 }, { distrito: "Metropolitano", total: 0 }, ...]
+   *          en el orden de DISTRITOS (de norte a sur)
    */
-  distritos() {
-    return this.iglesiaModel.aggregate<{ distrito: string; total: number }>([
+  async distritos() {
+    const filas = await this.iglesiaModel.aggregate<{ distrito: string; total: number }>([
       { $match: { isActive: true } },                               // solo activas
       { $group: { _id: '$distrito', total: { $sum: 1 } } },          // una fila por distrito, contando
       { $project: { _id: 0, distrito: '$_id', total: 1 } },          // renombra _id → distrito
-    ])
-      // Orden alfabético en español: "Ñuble" va después de "Norte", no al final
-      .sort({ distrito: 1 })
-      .collation({ locale: 'es' });
+    ]);
+    // Todos los de la lista fija, en su orden (los sin iglesias, con total 0). El map deja
+    // las claves siempre en el mismo orden (Mongo pone primero "total")
+    return ordenarPorDistrito(filas, (distrito) => ({ distrito, total: 0 })).map(({ distrito, total }) => ({ distrito, total }));
   }
 
   /**
@@ -102,14 +112,14 @@ export class IglesiasService {
    * 3 llenos, 12%. Así una ficha a medias también suma avance, no solo las completas.
    *
    * @returns [{ distrito: "Araucanía", iglesias: 14, completas: 2, porcentaje: 31 }, ...]
-   *          en orden alfabético español
+   *          en el orden de DISTRITOS (los sin iglesias, en 0)
    */
-  avancePorDistrito() {
+  async avancePorDistrito() {
     const campos = CAMPOS_FICHA_IGLESIA.length;
     // 1 si el campo tiene valor, 0 si no existe, es null o es ""
     const lleno = (campo: string) => ({ $cond: [{ $eq: [{ $ifNull: [`$${campo}`, ''] }, ''] }, 0, 1] });
 
-    return this.iglesiaModel.aggregate<{ distrito: string; iglesias: number; completas: number; porcentaje: number }>([
+    const filas = await this.iglesiaModel.aggregate<{ distrito: string; iglesias: number; completas: number; porcentaje: number }>([
       { $match: { isActive: true } },
       // Por iglesia: cuántos de los 5 datos tiene
       { $project: { distrito: 1, llenos: { $add: CAMPOS_FICHA_IGLESIA.map(lleno) } } },
@@ -131,10 +141,9 @@ export class IglesiasService {
           porcentaje: { $round: [{ $multiply: [{ $divide: ['$llenos', { $multiply: ['$iglesias', campos] }] }, 100] }, 0] },
         },
       },
-    ])
-      // Orden alfabético en español ("Ñuble" después de "Norte")
-      .sort({ distrito: 1 })
-      .collation({ locale: 'es' });
+    ]);
+    // En el orden de la lista fija (de norte a sur), con los distritos sin iglesias en 0
+    return ordenarPorDistrito(filas, (distrito) => ({ distrito, iglesias: 0, completas: 0, porcentaje: 0 }));
   }
 
   /**

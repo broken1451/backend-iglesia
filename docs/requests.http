@@ -137,6 +137,11 @@ GET {{baseUrl}}/iglesias?limit=20&offset=0
 GET {{baseUrl}}/iglesias?distrito=araucania&search=temuco
 
 
+### Iglesias · Buscar por comuna
+# Público. search busca en el nombre y en la comuna, sin distinguir tildes ni mayúsculas.
+GET {{baseUrl}}/iglesias?search=antofagasta
+
+
 ### Iglesias · Listar desactivadas (panel)
 # Con token de ADMIN, DISTRITO o IGLESIA. Sin token se ignora isActive.
 GET {{baseUrl}}/iglesias?isActive=false
@@ -144,28 +149,35 @@ Authorization: Bearer {{token}}
 
 
 ### Iglesias · Fichas incompletas (panel)
-# Con token de ADMIN, DISTRITO o IGLESIA: solo las iglesias sin horario, dirección o correo. Cada una trae "pendientes" con lo que le falta. Sin token se ignora.
+# Con token de ADMIN, DISTRITO o IGLESIA: solo las iglesias a las que les falta dirección, horario, pastor, correo o teléfono. Cada fila trae "ficha" ({ completos, total, porcentaje, completa, estado: "Faltan 5" }) y "pendientes". Sin token se ignora.
 GET {{baseUrl}}/iglesias?pendientes=true
 Authorization: Bearer {{token}}
 
 
+### Iglesias · Fichas completas (panel)
+# Con token de ADMIN, DISTRITO o IGLESIA: solo las iglesias con los 5 datos ("estado": "Completa").
+GET {{baseUrl}}/iglesias?pendientes=false
+Authorization: Bearer {{token}}
+
+
 ### Iglesias · Distritos
-# Distritos con iglesias activas y cuántas tiene cada uno.
+# Público. La lista fija de distritos, de norte a sur, con cuántas iglesias activas tiene cada uno. Llena el selector "Distrito" del formulario del panel y el filtro del sitio.
 GET {{baseUrl}}/iglesias/distritos
 
 
 ### Iglesias · Crear iglesia
-# DISTRITO o ADMIN (hoy abierto, ver api.md). lat y lng van juntas. Con los 5 datos (dirección, horario, pastor, correo y teléfono) la ficha queda completa: "pendientes": []. Guarda el _id en iglesiaId.
+# DISTRITO o ADMIN (hoy abierto, ver api.md). Los campos del formulario "Agregar iglesia": nombre, comuna, distrito (uno de la lista de GET /iglesias/distritos), dirección, horario, pastor, correo, teléfono y la ubicación del mapa (lat y lng van juntas). Con los 5 datos la ficha queda "Completa". Guarda el _id en iglesiaId.
 # @name crearIglesia
 POST {{baseUrl}}/iglesias
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "distrito": "Araucanía",
   "name": "Iglesia Bautista de Temuco",
+  "comuna": "Temuco",
+  "distrito": "Araucanía",
   "direccion": "Av. Alemania 0450, Temuco",
-  "reuniones": "Domingo 11:00, Miércoles 19:30",
+  "reuniones": "Domingo 11:00 · Miércoles 19:30",
   "encargado": "Pastor Juan Pérez",
   "email": "contacto@iglesiatemuco.cl",
   "telefono": "+56 45 221 3344",

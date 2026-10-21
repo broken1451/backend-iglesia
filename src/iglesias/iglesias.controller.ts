@@ -25,7 +25,8 @@ export class IglesiasController {
   constructor(private readonly iglesiasService: IglesiasService) {}
 
   /**
-   * GET /api/iglesias — Lista paginada. Filtros: ?distrito, ?search, ?isActive, ?pendientes, ?limit, ?offset.
+   * GET /api/iglesias — Lista paginada. Filtros: ?distrito, ?search (nombre o comuna), ?isActive,
+   * ?pendientes (true = fichas incompletas, false = completas), ?limit, ?offset.
    * hasMenuAccess decide si quien consulta puede ver también las desactivadas.
    */
   // Visitante (o rol sin acceso a Iglesias): solo activas.
@@ -37,8 +38,9 @@ export class IglesiasController {
   }
 
   /**
-   * GET /api/iglesias/distritos — Distritos con iglesias activas y cuántas tiene cada uno,
-   * para el filtro del sitio. Público: no cambia según quién consulta.
+   * GET /api/iglesias/distritos — La lista fija de distritos (de norte a sur) con cuántas
+   * iglesias activas tiene cada uno: llena el selector "Distrito" del formulario del panel y
+   * el filtro del sitio. Público: no cambia según quién consulta.
    */
   // Debe ir antes de ':id'; si no, "distritos" se tomaría como un id
   @Public()

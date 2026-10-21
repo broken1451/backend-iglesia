@@ -452,6 +452,32 @@
           }
         },
         {
+          "name": "Buscar por comuna",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/iglesias?search=antofagasta",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "iglesias"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "antofagasta"
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Público. search busca en el nombre y en la comuna, sin distinguir tildes ni mayúsculas."
+          }
+        },
+        {
           "name": "Listar desactivadas (panel)",
           "request": {
             "method": "GET",
@@ -494,7 +520,30 @@
                 }
               ]
             },
-            "description": "Con token de ADMIN, DISTRITO o IGLESIA: solo las iglesias sin horario, dirección o correo. Cada una trae \"pendientes\" con lo que le falta. Sin token se ignora."
+            "description": "Con token de ADMIN, DISTRITO o IGLESIA: solo las iglesias a las que les falta dirección, horario, pastor, correo o teléfono. Cada fila trae \"ficha\" ({ completos, total, porcentaje, completa, estado: \"Faltan 5\" }) y \"pendientes\". Sin token se ignora."
+          }
+        },
+        {
+          "name": "Fichas completas (panel)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/iglesias?pendientes=false",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "iglesias"
+              ],
+              "query": [
+                {
+                  "key": "pendientes",
+                  "value": "false"
+                }
+              ]
+            },
+            "description": "Con token de ADMIN, DISTRITO o IGLESIA: solo las iglesias con los 5 datos (\"estado\": \"Completa\")."
           }
         },
         {
@@ -515,7 +564,7 @@
                 "distritos"
               ]
             },
-            "description": "Distritos con iglesias activas y cuántas tiene cada uno."
+            "description": "Público. La lista fija de distritos, de norte a sur, con cuántas iglesias activas tiene cada uno. Llena el selector \"Distrito\" del formulario del panel y el filtro del sitio."
           }
         },
         {
@@ -543,7 +592,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"distrito\": \"Araucanía\",\n  \"name\": \"Iglesia Bautista de Temuco\",\n  \"direccion\": \"Av. Alemania 0450, Temuco\",\n  \"reuniones\": \"Domingo 11:00, Miércoles 19:30\",\n  \"encargado\": \"Pastor Juan Pérez\",\n  \"email\": \"contacto@iglesiatemuco.cl\",\n  \"telefono\": \"+56 45 221 3344\",\n  \"lat\": -38.7359,\n  \"lng\": -72.5904\n}",
+              "raw": "{\n  \"name\": \"Iglesia Bautista de Temuco\",\n  \"comuna\": \"Temuco\",\n  \"distrito\": \"Araucanía\",\n  \"direccion\": \"Av. Alemania 0450, Temuco\",\n  \"reuniones\": \"Domingo 11:00 · Miércoles 19:30\",\n  \"encargado\": \"Pastor Juan Pérez\",\n  \"email\": \"contacto@iglesiatemuco.cl\",\n  \"telefono\": \"+56 45 221 3344\",\n  \"lat\": -38.7359,\n  \"lng\": -72.5904\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -559,7 +608,7 @@
                 "iglesias"
               ]
             },
-            "description": "DISTRITO o ADMIN (hoy abierto, ver api.md). lat y lng van juntas. Con los 5 datos (dirección, horario, pastor, correo y teléfono) la ficha queda completa: \"pendientes\": []. Guarda el _id en iglesiaId."
+            "description": "DISTRITO o ADMIN (hoy abierto, ver api.md). Los campos del formulario \"Agregar iglesia\": nombre, comuna, distrito (uno de la lista de GET /iglesias/distritos), dirección, horario, pastor, correo, teléfono y la ubicación del mapa (lat y lng van juntas). Con los 5 datos la ficha queda \"Completa\". Guarda el _id en iglesiaId."
           }
         },
         {

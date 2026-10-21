@@ -1,6 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
-import { camposFaltantes } from '../../common/utils/pendientes.utils.js';
+import { camposFaltantes, estadoFicha } from '../../common/utils/pendientes.utils.js';
 
 /**
  * Los 5 datos de una ficha completa: dirección, horario, pastor, correo y teléfono.
@@ -31,6 +31,10 @@ export class Iglesia extends Document {
     /** Dirección postal. */
     @Prop({ type: String, trim: true })
     direccion?: string;
+
+    /** Comuna (ej. "Antofagasta"). La tabla del panel la muestra bajo el nombre. */
+    @Prop({ type: String, trim: true })
+    comuna?: string;
 
     /** Horarios de reunión, texto libre. Ej: "Domingo 11:00, Miércoles 19:30" */
     @Prop({ type: String, trim: true })
@@ -71,6 +75,12 @@ export class Iglesia extends Document {
      * [] = ficha completa. Ej: ["reuniones", "email"].
      */
     pendientes: string[];
+
+    /**
+     * Campo calculado (no se guarda): columnas "Ficha" y "Estado" de la tabla del panel.
+     * Ej: { completos: 0, total: 5, porcentaje: 0, completa: false, estado: "Faltan 5" }
+     */
+    ficha: ReturnType<typeof estadoFicha>;
 }
 
 /** Esquema de Mongoose generado a partir de la clase (lo registra IglesiasModule). */
@@ -87,6 +97,11 @@ IglesiaSchema.index(
 // Calcula "pendientes" a partir de lo guardado, cada vez que se lee (no ocupa espacio en Mongo)
 IglesiaSchema.virtual('pendientes').get(function (this: Iglesia) {
     return camposFaltantes(this, CAMPOS_FICHA_IGLESIA);
+});
+
+// "0/5 · Faltan 5": cuántos de los datos de la ficha están llenos
+IglesiaSchema.virtual('ficha').get(function (this: Iglesia) {
+    return estadoFicha(camposFaltantes(this, CAMPOS_FICHA_IGLESIA).length, CAMPOS_FICHA_IGLESIA.length);
 });
 
 // Al convertir a JSON para la respuesta: sin el campo interno "__v" y con los virtuales (pendientes)

@@ -17,6 +17,7 @@ const createModelMock = () => {
     findOne: vi.fn(),
     findById: vi.fn(),
     create: vi.fn(),
+    aggregate: vi.fn(),
   };
 };
 
@@ -50,15 +51,30 @@ describe('IglesiasService', () => {
       expect(model.find).toHaveBeenCalledWith({ isActive: false });
     });
 
-    it('?pendientes=true: el panel ve las fichas incompletas; a un visitante se le ignora', async () => {
+    it('?pendientes: el panel filtra por estado de la ficha; a un visitante se le ignora', async () => {
+      const campos = ['direccion', 'reuniones', 'encargado', 'email', 'telefono'];
+
       await service.findAll({ pendientes: true }, true);
       expect(model.find.mock.calls[0][0]).toEqual({
         isActive: true,
-        $or: ['direccion', 'reuniones', 'encargado', 'email', 'telefono'].map((campo) => ({ [campo]: { $in: [null, ''] } })),
+        $and: [{ $or: campos.map((campo) => ({ [campo]: { $in: [null, ''] } })) }],
+      });
+
+      await service.findAll({ pendientes: false }, true);
+      expect(model.find.mock.calls[1][0]).toEqual({
+        isActive: true,
+        $and: [{ $and: campos.map((campo) => ({ [campo]: { $nin: [null, ''] } })) }],
       });
 
       await service.findAll({ pendientes: true }, false);
-      expect(model.find.mock.calls[1][0]).toEqual({ isActive: true });
+      expect(model.find.mock.calls[2][0]).toEqual({ isActive: true });
+    });
+
+    it('search busca en el nombre o la comuna, sin pisarse con ?pendientes', async () => {
+      await service.findAll({ search: 'antofagasta', pendientes: true }, true);
+      const { $and } = model.find.mock.calls[0][0];
+      expect($and).toHaveLength(2);
+      expect($and[0].$or[1].comuna.test('Antofagasta')).toBe(true);
     });
 
     it('filtra distrito exacto y nombre sin tildes', async () => {
@@ -66,7 +82,7 @@ describe('IglesiasService', () => {
       const filter = model.find.mock.calls[0][0];
       expect(filter.distrito.test('Araucanía')).toBe(true);
       expect(filter.distrito.test('Araucanía Norte')).toBe(false);
-      expect(filter.name.test('Iglesia de Concepción')).toBe(true);
+      expect(filter.$and[0].$or[0].name.test('Iglesia de Concepción')).toBe(true);
     });
 
     it('pagina con valores por defecto', async () => {
@@ -148,6 +164,37 @@ describe('IglesiasService', () => {
       model.findById.mockResolvedValue(iglesia);
       await service.update('abc', { isActive: false }, usuario);
       expect(historial.anotar).toHaveBeenLastCalledWith(expect.objectContaining({ accion: 'desactivar' }));
+    });
+  });
+
+  describe('distritos (lista fija)', () => {
+    it('devuelve todos los de la lista, de norte a sur, con 0 los que no tienen iglesias', async () => {
+      model.aggregate.mockResolvedValue([
+        { distrito: 'Araucanía', total: 14 },
+        { distrito: 'Norte', total: 2 },
+      ]);
+      expect(await service.distritos()).toEqual([
+        { distrito: 'Norte', total: 2 },
+        { distrito: 'Metropolitano', total: 0 },
+        { distrito: 'Valle Central', total: 0 },
+        { distrito: 'Biobío', total: 0 },
+        { distrito: 'Araucanía', total: 14 },
+        { distrito: 'Los Ríos', total: 0 },
+      ]);
+    });
+
+    it('un distrito antiguo que no está en la lista va al final', async () => {
+      model.aggregate.mockResolvedValue([{ distrito: 'Austral', total: 1 }]);
+      const distritos = await service.distritos();
+      expect(distritos.at(-1)).toEqual({ distrito: 'Austral', total: 1 });
+      expect(distritos).toHaveLength(7);
+    });
+
+    it('el avance por distrito sigue el mismo orden', async () => {
+      model.aggregate.mockResolvedValue([{ distrito: 'Los Ríos', iglesias: 6, completas: 0, porcentaje: 0 }]);
+      const avance = await service.avancePorDistrito();
+      expect(avance.map((fila) => fila.distrito)).toEqual(['Norte', 'Metropolitano', 'Valle Central', 'Biobío', 'Araucanía', 'Los Ríos']);
+      expect(avance[0]).toEqual({ distrito: 'Norte', iglesias: 0, completas: 0, porcentaje: 0 });
     });
   });
 });

@@ -5,7 +5,7 @@ import { CreateActividadDto } from './dto/create-actividad.dto.js';
 import { UpdateActividadDto } from './dto/update-actividad.dto.js';
 import { FindActividadesDto } from './dto/find-actividades.dto.js';
 import { Actividad, CAMPOS_FICHA_ACTIVIDAD, DISTRITO_NACIONAL } from './entities/actividad.entity.js';
-import { faltaAlguno } from '../common/utils/pendientes.utils.js';
+import { faltaAlguno, tieneTodos } from '../common/utils/pendientes.utils.js';
 import { HistorialService, accionAlEditar } from '../historial/historial.service.js';
 import { AccionHistorial } from '../historial/entities/historial.entity.js';
 import type { Auth } from '../auth/entities/auth.entity.js';
@@ -53,7 +53,7 @@ export class ActividadesService {
    *     incluye todo ese día en hora de Chile)
    *   - distrito: exacto, sin tildes ni mayúsculas ("Nacional" trae las nacionales)
    *   - search: en el título, sin tildes ni mayúsculas
-   *   - pendientes: solo las que tienen datos por completar (solo panel)
+   *   - pendientes: true = las que tienen datos por completar, false = las completas (solo panel)
    *   - isActive, limit, offset
    * @param verInactivas true solo para roles que gestionan actividades. Si es false,
    *   siempre devuelve solo activas aunque se pida ?isActive=false.
@@ -70,9 +70,11 @@ export class ActividadesService {
       // Sigue vigente si termina después de "desde" (o, sin fecha_fin, si empieza después)
       Object.assign(filter, vigentesDesde(inicioDelDia(desde)));
     }
-    // Actividades incompletas, para el botón "Ir" del Por hacer (solo panel). Va dentro de $and
-    // porque ?desde también usa $or y uno pisaría al otro
-    if (pendientes && verInactivas) filter.$and = [faltaAlguno(CAMPOS_FICHA_ACTIVIDAD)];
+    // Solo panel: true = incompletas (botón "Ir" del Por hacer), false = completas. Va dentro de
+    // $and porque ?desde también usa $or y uno pisaría al otro
+    if (pendientes !== undefined && verInactivas) {
+      filter.$and = [pendientes ? faltaAlguno(CAMPOS_FICHA_ACTIVIDAD) : tieneTodos(CAMPOS_FICHA_ACTIVIDAD)];
+    }
 
     // La página y el total se piden a la vez para no esperar dos viajes a Mongo
     const [data, total] = await Promise.all([

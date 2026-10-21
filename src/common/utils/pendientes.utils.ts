@@ -52,3 +52,32 @@ export const nombrarCampos = (campos: readonly string[]) => {
   const texto = nombres.length > 1 ? `${nombres.slice(0, -1).join(', ')} y ${nombres.at(-1)}` : (nombres[0] ?? '');
   return texto.charAt(0).toUpperCase() + texto.slice(1);
 };
+
+/**
+ * Filtro de Mongo: registros que tienen TODOS los campos llenos (lo contrario de faltaAlguno).
+ * `$nin: [null, '']` excluye los tres casos de vacío: no existe, es null o es "".
+ *
+ * @example tieneTodos(['lugar']) // { $and: [{ lugar: { $nin: [null, ''] } }] }
+ */
+export const tieneTodos = (campos: readonly string[]) => ({
+  $and: campos.map((campo) => ({ [campo]: { $nin: [null, ''] } })),
+});
+
+/**
+ * Columnas "Ficha" (0/5 con barra) y "Estado" ("Faltan 5" / "Completa") de la tabla del panel.
+ *
+ * @param faltan cuántos datos faltan
+ * @param total  cuántos datos tiene una ficha completa
+ * @example estadoFicha(5, 5) // { completos: 0, total: 5, porcentaje: 0, completa: false, estado: 'Faltan 5' }
+ * @example estadoFicha(1, 5) // { completos: 4, total: 5, porcentaje: 80, completa: false, estado: 'Falta 1' }
+ */
+export const estadoFicha = (faltan: number, total: number) => {
+  const completos = total - faltan;
+  return {
+    completos,
+    total,
+    porcentaje: total ? Math.round((completos / total) * 100) : 100,
+    completa: faltan === 0,
+    estado: faltan === 0 ? 'Completa' : `${faltan === 1 ? 'Falta' : 'Faltan'} ${faltan}`,
+  };
+};

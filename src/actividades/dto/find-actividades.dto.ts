@@ -35,7 +35,7 @@ export class FindActividadesDto extends PaginationDto {
     @IsOptional()
     isActive?: boolean;
 
-    // Solo para el panel: ?pendientes=true lista los que tienen datos por completar (ver "pendientes")
+    // Solo para el panel: ?pendientes=true lista los incompletos (ver "pendientes"); ?pendientes=false, los completos
     /** El servicio lo ignora si quien consulta no gestiona actividades. */
     @ToBoolean()
     @IsBoolean()

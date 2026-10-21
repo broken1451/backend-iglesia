@@ -501,17 +501,31 @@ Directorio de iglesias del sitio.
 
 | Campo | Tipo | Descripción |
 |---|---|---|
-| `distrito` | texto | Ej. "Araucanía" |
+| `distrito` | texto | Uno de la [lista fija](#get-iglesiasdistritos): `Norte`, `Metropolitano`, `Valle Central`, `Biobío`, `Araucanía`, `Los Ríos` |
 | `name` | texto | Nombre. Único dentro del distrito |
 | `direccion` | texto | Dirección postal |
+| `comuna` | texto | Comuna (ej. "Antofagasta"). La tabla del panel la muestra bajo el nombre |
 | `reuniones` | texto | Horarios, texto libre |
 | `encargado` | texto | Pastor o encargado |
 | `email` | texto | Correo de contacto, en minúsculas |
 | `telefono` | texto | Teléfono o WhatsApp, ej. `"+56 9 1234 5678"` |
 | `lat`, `lng` | número | Coordenadas para el mapa. Siempre las dos o ninguna |
 | `pendientes` | lista | Calculado: cuáles de los 5 datos de una ficha completa faltan (`direccion`, `reuniones`, `encargado`, `email`, `telefono`) |
+| `ficha` | objeto | Calculado: columnas **Ficha** y **Estado** de la tabla del panel. `{ "completos": 0, "total": 5, "porcentaje": 0, "completa": false, "estado": "Faltan 5" }`. `estado` es `"Completa"`, `"Falta 1"` o `"Faltan N"` |
 
 Más los [campos que agrega la API](#campos-que-agrega-la-api). Los campos opcionales que no se enviaron no aparecen en la respuesta.
+
+**La tabla de iglesias del panel** sale directo de cada fila de `GET /iglesias`:
+
+| Columna | Campo |
+|---|---|
+| Iglesia (nombre y, debajo, la comuna) | `name`, `comuna` |
+| Distrito | `distrito` |
+| Ficha: barra y "0/5" | `ficha.porcentaje`, `ficha.completos` / `ficha.total` |
+| Estado: "Faltan 5" / "Completa" | `ficha.estado` (color según `ficha.completa`) |
+| ✏️ Editar | `PATCH /iglesias/:id` con el `_id` de la fila |
+
+Filtros útiles para la tabla: `?pendientes=true` (solo incompletas), `?pendientes=false` (solo completas), `?search=antofagasta` (nombre o comuna).
 
 ---
 
@@ -524,9 +538,9 @@ Más los [campos que agrega la API](#campos-que-agrega-la-api). Los campos opcio
 | Parámetro | Descripción |
 |---|---|
 | `distrito` | Distrito exacto, sin mayúsculas ni tildes |
-| `search` | Busca en el nombre |
+| `search` | Busca en el nombre o la comuna |
 | `isActive` | `false` lista las desactivadas. **Solo con token de ADMIN, DISTRITO o IGLESIA**; para el resto se ignora y siempre ven las activas |
-| `pendientes` | `true` lista solo las fichas incompletas (les falta dirección, horario, pastor, correo o teléfono). Solo panel, como `isActive` |
+| `pendientes` | `true` lista solo las fichas incompletas (les falta dirección, horario, pastor, correo o teléfono); `false`, solo las completas. Solo panel, como `isActive` |
 | `limit`, `offset` | [Paginación](#listados-y-paginación) |
 
 **Ejemplo: filtrar**
@@ -548,15 +562,18 @@ curl "http://localhost:3500/api/iglesias?distrito=araucania&search=temuco"
       "distrito": "Araucanía",
       "name": "Iglesia Bautista de Temuco",
       "direccion": "Av. Alemania 0450, Temuco",
+      "comuna": "Temuco",
       "reuniones": "Domingo 11:00, Miércoles 19:30",
       "encargado": "Pastor Juan Pérez",
       "email": "contacto@iglesiatemuco.cl",
+      "telefono": "+56 45 221 3344",
       "lat": -38.7359,
       "lng": -72.5904,
       "isActive": true,
       "created_at": "2026-10-20T12:18:59.287Z",
       "update_at": "2026-10-20T12:18:59.287Z",
-      "pendientes": []
+      "pendientes": [],
+      "ficha": { "completos": 5, "total": 5, "porcentaje": 100, "completa": true, "estado": "Completa" }
     }
   ]
 }
@@ -604,7 +621,11 @@ El mismo request **sin token** devuelve las activas: un visitante no puede ver l
 
 ### `GET /iglesias/distritos`
 
-🌐 **Público** — Los distritos que tienen al menos una iglesia activa, con cuántas tiene cada uno. Pensado para el filtro de distritos del sitio. Orden alfabético español ("Ñuble" va después de "Norte").
+🌐 **Público** — **La lista fija de distritos**, de norte a sur, con cuántas iglesias activas tiene cada uno.
+- **Panel:** llena el selector "Distrito" del formulario "Agregar iglesia" (usar `distrito`).
+- **Sitio:** el filtro de distritos (puede ocultar los de `total: 0`).
+
+La lista vive en `src/iglesias/distritos.ts`; para agregar un distrito se suma ahí, en su lugar. Si en la base quedó alguna iglesia con un distrito que no está en la lista (cargada antes de que existiera), aparece al final.
 
 ```bash
 curl http://localhost:3500/api/iglesias/distritos
@@ -614,10 +635,12 @@ curl http://localhost:3500/api/iglesias/distritos
 
 ```json
 [
-  { "total": 2, "distrito": "Araucanía" },
-  { "total": 1, "distrito": "Biobío" },
-  { "total": 1, "distrito": "Norte" },
-  { "total": 1, "distrito": "Ñuble" }
+  { "distrito": "Norte", "total": 1 },
+  { "distrito": "Metropolitano", "total": 0 },
+  { "distrito": "Valle Central", "total": 0 },
+  { "distrito": "Biobío", "total": 0 },
+  { "distrito": "Araucanía", "total": 2 },
+  { "distrito": "Los Ríos", "total": 0 }
 ]
 ```
 
@@ -659,9 +682,10 @@ No existe, o está desactivada y quien consulta es un visitante → `404`:
 
 | Campo | Tipo | Obligatorio | Reglas |
 |---|---|:-:|---|
-| `distrito` | texto | ✅ | Máx. 100 |
+| `distrito` | texto | ✅ | **Uno de la lista fija**, escrito exacto (con tildes): `Norte`, `Metropolitano`, `Valle Central`, `Biobío`, `Araucanía`, `Los Ríos`. El panel la obtiene de [`GET /iglesias/distritos`](#get-iglesiasdistritos) |
 | `name` | texto | ✅ | Máx. 150. **Único dentro del distrito** (sin distinguir mayúsculas ni espacios extra) |
 | `direccion` | texto | | Máx. 250 |
+| `comuna` | texto | | Máx. 100 |
 | `reuniones` | texto | | Máx. 250 |
 | `encargado` | texto | | Máx. 150 |
 | `email` | texto | | Email válido. Se guarda en minúsculas |
@@ -669,7 +693,23 @@ No existe, o está desactivada y quien consulta es un visitante → `404`:
 | `lat` | número | | Entre -90 y 90. **Junto con `lng`** |
 | `lng` | número | | Entre -180 y 180. **Junto con `lat`** |
 
-Los espacios repetidos o en los extremos de `distrito`, `name`, `direccion` y `encargado` se eliminan antes de guardar. `lat` y `lng` también se aceptan como texto numérico (`"-38.73"`), pero lo correcto es enviarlos como número.
+**El formulario "Agregar iglesia" del panel** usa exactamente estos campos:
+
+| En el formulario | Campo |
+|---|---|
+| Nombre | `name` |
+| Comuna | `comuna` |
+| Distrito (selector) | `distrito` |
+| Dirección | `direccion` |
+| Horario de reuniones | `reuniones` |
+| Pastor o encargado | `encargado` |
+| Correo de la iglesia | `email` |
+| Teléfono | `telefono` |
+| Ubicación en el mapa / Latitud / Longitud | `lat`, `lng` (el punto del mapa; se envían las dos o ninguna) |
+
+"Guardar cambios" al editar es un `PATCH /iglesias/:id` con los mismos campos (solo los que cambiaron).
+
+Los espacios repetidos o en los extremos de `distrito`, `name`, `direccion`, `comuna`, `encargado` y `telefono` se eliminan antes de guardar. `lat` y `lng` también se aceptan como texto numérico (`"-38.73"`), pero lo correcto es enviarlos como número.
 
 **Ejemplo**
 
@@ -677,7 +717,7 @@ Los espacios repetidos o en los extremos de `distrito`, `name`, `direccion` y `e
 curl -X POST http://localhost:3500/api/iglesias \
   -H "Authorization: Bearer TOKEN_DISTRITO" \
   -H "Content-Type: application/json" \
-  -d '{"distrito":"Araucanía","name":"Iglesia Bautista de Temuco","direccion":"Av. Alemania 0450, Temuco","reuniones":"Domingo 11:00, Miércoles 19:30","encargado":"Pastor Juan Pérez","email":"Contacto@IglesiaTemuco.cl","lat":-38.7359,"lng":-72.5904}'
+  -d '{"name":"Iglesia Bautista de Temuco","comuna":"Temuco","distrito":"Araucanía","direccion":"Av. Alemania 0450, Temuco","reuniones":"Domingo 11:00, Miércoles 19:30","encargado":"Pastor Juan Pérez","email":"Contacto@IglesiaTemuco.cl","telefono":"+56 45 221 3344","lat":-38.7359,"lng":-72.5904}'
 ```
 
 **Respuesta `201`**
@@ -687,16 +727,19 @@ curl -X POST http://localhost:3500/api/iglesias \
   "distrito": "Araucanía",
   "name": "Iglesia Bautista de Temuco",
   "direccion": "Av. Alemania 0450, Temuco",
+  "comuna": "Temuco",
   "reuniones": "Domingo 11:00, Miércoles 19:30",
   "encargado": "Pastor Juan Pérez",
   "email": "contacto@iglesiatemuco.cl",
+  "telefono": "+56 45 221 3344",
   "lat": -38.7359,
   "lng": -72.5904,
   "isActive": true,
   "_id": "6ad75c33e4515633ec65ee46",
   "created_at": "2026-10-20T12:18:59.287Z",
   "update_at": "2026-10-20T12:18:59.287Z",
-  "pendientes": []
+  "pendientes": [],
+  "ficha": { "completos": 5, "total": 5, "porcentaje": 100, "completa": true, "estado": "Completa" }
 }
 ```
 
@@ -708,7 +751,13 @@ Body mínimo:
 
 **Errores**
 
-Nombre repetido en el distrito. Este body choca con la de Temuco, aunque cambie mayúsculas, tildes del distrito y espacios: `{"distrito":"araucanía","name":"  IGLESIA   BAUTISTA DE TEMUCO "}` → `400`:
+Distrito que no está en la lista (o mal escrito, como `"araucania"`) → `400`:
+
+```json
+{ "message": ["distrito must be one of: Norte, Metropolitano, Valle Central, Biobío, Araucanía, Los Ríos"], "error": "Bad Request", "statusCode": 400 }
+```
+
+Nombre repetido en el distrito. Este body choca con la de Temuco, aunque cambie mayúsculas y espacios: `{"distrito":"Araucanía","name":"  IGLESIA   BAUTISTA DE TEMUCO "}` → `400`:
 
 ```json
 { "message": "An iglesia with that name already exists in that distrito", "error": "Bad Request", "statusCode": 400 }
@@ -795,7 +844,6 @@ curl -X DELETE http://localhost:3500/api/iglesias/6ad75c33e4515633ec65ee4a \
 | Prioridad | Qué | Por qué |
 |:-:|---|---|
 | 🔴 Alta | **Volver a proteger `POST /iglesias`** con `@Roles(...MENU.iglesias.editan)` y quitar `@OptionalAuth()` | Hoy cualquiera, sin login, puede crear iglesias en el directorio público |
-| 🟡 Media | **Lista fija de distritos** (un enum o una colección) en vez de texto libre | Un error de tipeo ("Araucania" / "Araucanía ") crea un distrito nuevo en el filtro del sitio |
 | 🟡 Media | **DISTRITO edita solo las iglesias de su distrito** | Hoy un DISTRITO puede editar las de cualquier distrito (requiere asociar usuario y distrito, ver Auth) |
 | 🟢 Baja | Que el nombre único **ignore también las tildes** ("Concepción" = "Concepcion") | Hoy solo ignora mayúsculas (`strength: 2`); con `strength: 1` ignoraría ambas |
 | 🟢 Baja | **Buscar por cercanía** (`?cerca=lat,lng`) con un índice geoespacial | Para "iglesias cerca de mí" en el mapa del sitio |
@@ -838,7 +886,7 @@ Más los [campos que agrega la API](#campos-que-agrega-la-api).
 | `distrito` | Exacto, sin mayúsculas ni tildes. `nacional` trae las nacionales |
 | `search` | Busca en el título |
 | `isActive` | `false` lista las desactivadas (solo panel: ADMIN, COMUNICACIONES, DISTRITO, IGLESIA) |
-| `pendientes` | `true` lista solo las que no tienen descripción o lugar (solo panel). Junto con `desde=hoy`, las próximas por completar |
+| `pendientes` | `true` lista solo las que no tienen descripción o lugar; `false`, solo las completas (solo panel). Junto con `desde=hoy`, las próximas por completar |
 | `limit`, `offset` | [Paginación](#listados-y-paginación) |
 
 **Ejemplo: próximas actividades para el sitio**
@@ -1096,7 +1144,7 @@ Más los [campos que agrega la API](#campos-que-agrega-la-api).
 |---|---|
 | `publicado` | `false` lista los borradores (solo panel). Para el resto se ignora y siempre reciben las publicadas |
 | `isActive` | `false` lista las desactivadas, para reactivarlas (solo panel: ADMIN, COMUNICACIONES). Para el resto se ignora |
-| `pendientes` | `true` lista solo las que no tienen imagen (solo panel) |
+| `pendientes` | `true` lista solo las que no tienen imagen; `false`, solo las que sí (solo panel) |
 | `categoria` | Una de las 4 categorías (escrita exacta, con tilde: `Oraci%C3%B3n` en la URL) |
 | `search` | Busca en el título |
 | `limit`, `offset` | [Paginación](#listados-y-paginación) |
@@ -1348,7 +1396,7 @@ La pantalla [Resumen](#get-resumen) ya entrega las 4 tarjetas, el "Por hacer" (f
 | 🟡 Media | **Cambios por aprobar** ("Revisar cambio de Oasis de Esperanza · Traiguén" + botón **Aprobar**) | Requiere que una iglesia proponga cambios a su ficha y un DISTRITO los apruebe: hoy los cambios se guardan directo |
 | 🟡 Media | **Módulo Devocional** ("Escribir 3 reflexiones para los próximos días sin texto") | Está en el menú y en los accesos rápidos, pero no tiene API |
 | 🟡 Media | **Módulo Proyectos** (acceso "Actualizar proyectos") | Igual: está en el menú, sin API |
-| 🟡 Media | **Orden de los distritos** como en el diseño (Norte → Los Ríos) | Hoy van en orden alfabético: no hay una lista de distritos con su orden geográfico (ver Iglesias) |
+| 🟢 Baja | Usar la lista fija de distritos también en **actividades** (más `"Nacional"`) | Hoy en actividades el distrito sigue siendo texto libre |
 | 🟢 Baja | **Inscripciones reales** en vez de cargar `inscritos` a mano | La inscripción hoy es un formulario externo (`inscripcion_url`) que la API no ve |
 | 🟢 Baja | Eventos que no son cambios de datos en "Actividad reciente" ("Comunicaciones activó la transmisión en vivo") | Necesita la sección Configuración con su API |
 | 🟢 Baja | Mostrar el **rol o distrito** en "Actividad reciente" ("Distrito Araucanía actualizó...") | Hoy muestra el nombre de la persona; el distrito requiere asociarlo al usuario (ver Auth) |
@@ -1506,8 +1554,12 @@ curl http://localhost:3500/api/resumen \
   "avanceDistritos": {
     "detalle": "Cada ficha completa tiene 5 datos: dirección, horario, pastor, correo y teléfono.",
     "distritos": [
+      { "distrito": "Norte", "iglesias": 0, "porcentaje": 0 },
+      { "distrito": "Metropolitano", "iglesias": 0, "porcentaje": 0 },
+      { "distrito": "Valle Central", "iglesias": 2, "porcentaje": 80 },
+      { "distrito": "Biobío", "iglesias": 0, "porcentaje": 0 },
       { "distrito": "Araucanía", "iglesias": 1, "porcentaje": 0 },
-      { "distrito": "Valle Central", "iglesias": 2, "porcentaje": 80 }
+      { "distrito": "Los Ríos", "iglesias": 0, "porcentaje": 0 }
     ]
   }
 }
@@ -1524,7 +1576,7 @@ curl http://localhost:3500/api/resumen \
 | `porHacer` | Recuadro "Por hacer" | Igual que [`GET /resumen/por-hacer`](#get-resumenpor-hacer) | Según lo que puede editar |
 | `accesosRapidos` | "Publicar noticia", "Crear actividad"... | `ACCESOS_RAPIDOS` en `menu.config.ts`: con API, quien puede editar; sin API (proyectos, devocional), quien ve la sección | Según el rol |
 | `actividadReciente` | "20 oct · Distrito Araucanía actualizó la ficha de..." | Los 5 últimos cambios del historial, de las secciones que ve. `fecha` en UTC: mostrarla con `timeZone: 'America/Santiago'` | Según las secciones que ve |
-| `avanceDistritos` | "Avance de fichas por distrito" | Por distrito: datos llenos / datos posibles. Ej. 5 iglesias × 5 datos = 25; con 3 llenos, **12%**. Así una ficha a medias también suma | Quien ve Iglesias |
+| `avanceDistritos` | "Avance de fichas por distrito" | Todos los distritos de la lista fija, **de norte a sur** (los sin iglesias, en 0). Por distrito: datos llenos / datos posibles. Ej. 5 iglesias × 5 datos = 25; con 3 llenos, **12%**. Así una ficha a medias también suma | Quien ve Iglesias |
 
 `ruta` (en `porHacer` y `accesosRapidos`) es la `ruta` de la sección en el menú, con filtros (`?pendientes=true`) o `/nueva` para el formulario de crear.
 

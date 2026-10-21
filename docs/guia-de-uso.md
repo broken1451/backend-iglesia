@@ -23,12 +23,12 @@ Con la API corriendo (`yarn start:dev`), hay tres formas de probarla sin escribi
 2. Abre la colección → pestaña **Variables** → revisa `baseUrl` (`http://localhost:3500/api`) y pon tu correo y contraseña en `email` y `password`.
 3. Ejecuta **Auth → Login**. El token queda guardado solo en la variable `token` y lo usan todos los demás requests.
 4. Al crear una iglesia, actividad o noticia, su `_id` también se guarda (`iglesiaId`, `actividadId`, `noticiaId`), y "Mensajes → Listar todos" guarda el del primer mensaje (`mensajeId`), así que "Ver", "Editar" y "Desactivar" funcionan sin copiar ids.
-5. Para probar todo de una vez: clic derecho en la colección → **Run collection**. Los 62 requests están en el orden en que se pueden correr seguidos (con un usuario ADMIN en `email` / `password`).
+5. Para probar todo de una vez: clic derecho en la colección → **Run collection**. Los 64 requests están en el orden en que se pueden correr seguidos (con un usuario ADMIN en `email` / `password`).
 
 | Carpeta | Qué trae |
 |---|---|
 | Auth (11) | Login, registro, mi usuario, y la gestión de usuarios del ADMIN (roles, clave, desactivar, desbloquear) |
-| Iglesias (12) | Listados del sitio y del panel (desactivadas, fichas incompletas), distritos, crear, editar, completar ficha |
+| Iglesias (14) | Listados del sitio y del panel (desactivadas, fichas incompletas y completas), búsqueda por comuna, distritos, crear, editar, completar ficha |
 | Actividades (13) | Próximas, nacionales, rango de fechas, por completar, crear, editar, inscritos, desactivar |
 | Noticias (13) | Listado, categoría, búsqueda, borradores, desactivadas, sin imagen, crear, publicar, editar |
 | Mensajes (10) | Formulario del sitio (sin token), listar, buscar, ver, marcar leído / no leído, archivar, recuperar |
@@ -189,6 +189,14 @@ Un bloque en `null` significa que el rol no ve esa sección: no se dibuja. Para 
 | Revisar N borradores más | `noticias?publicado=false` |
 
 Además, cada iglesia, actividad y noticia trae `pendientes` (ej. `["encargado", "telefono"]`), para marcar en la tabla del panel qué le falta a cada fila.
+
+### Formulario "Agregar iglesia"
+- El selector **Distrito** se llena con `GET /api/iglesias/distritos` (campo `distrito`, ya en orden de norte a sur).
+- "Guardar" envía `POST /api/iglesias` con `name`, `comuna`, `distrito`, `direccion`, `reuniones`, `encargado`, `email`, `telefono`, y `lat` / `lng` del punto del mapa (las dos o ninguna). Al editar, `PATCH /api/iglesias/:id` solo con lo que cambió.
+- Los errores llegan como `400` con la lista de mensajes; cada uno empieza con el nombre del campo (`"telefono must be..."`), para mostrarlo bajo el campo correcto. [Detalle](api.md#post-iglesias).
+
+### La tabla de iglesias
+Cada fila de `GET /api/iglesias` trae lo que muestran las columnas: `name` y `comuna` (Iglesia), `distrito`, y `ficha` para **Ficha** ("0/5" y la barra con `ficha.porcentaje`) y **Estado** (`ficha.estado`: "Faltan 5", "Falta 1" o "Completa"; `ficha.completa` sirve para el color). Para filtrar la tabla: `?pendientes=true` (incompletas), `?pendientes=false` (completas), `?search=` (nombre o comuna). [Detalle](api.md#objeto-iglesia).
 
 ### Mensajes del sitio
 - `GET /api/mensajes?leido=false` → los nuevos.
@@ -496,6 +504,7 @@ function enlaceGoogleCalendar(a) {
 | Desbloquear una cuenta (3 intentos fallidos) | `PATCH /api/auth/:id` con `{ "unblock": true }` |
 | Cambiar la contraseña de alguien | `PATCH /api/auth/:id` con `{ "password": "nueva-clave" }` |
 | Agregar una categoría de noticias | Sumarla en `src/noticias/interfaces/categoria.enum.ts` (y su ícono en el front) |
+| Agregar un distrito | Sumarlo en `src/iglesias/distritos.ts`, en su lugar (de norte a sur) |
 | Darle una sección del menú a otro rol | Agregar el rol en `src/auth/menu/menu.config.ts`: cambia el menú **y** los permisos de la API |
 | Ver un correo sin enviarlo | `email.transport: "file"` en `config.yaml`, y abrir el `.eml` de `mails/` |
 | Enviar correos de verdad | `transport: "smtp"` + `MAIL_USER` / `MAIL_PASSWORD` en `.env` ([correo.md](correo.md#enviar-de-verdad-smtp)) |
