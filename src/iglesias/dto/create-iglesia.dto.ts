@@ -1,4 +1,4 @@
-import { IsEmail, IsLatitude, IsLongitude, IsNotEmpty, IsOptional, IsString, MaxLength } from "class-validator";
+import { IsEmail, IsLatitude, IsLongitude, IsNotEmpty, IsOptional, IsString, Matches, MaxLength } from "class-validator";
 import { NormalizeSpaces } from "../../common/transforms/normalize-spaces.transform.js";
 
 /**
@@ -48,6 +48,14 @@ export class CreateIglesiaDto {
     @IsEmail()
     @IsOptional()
     email?: string;
+
+    // "+56 9 1234 5678", "(45) 221 3344": dígitos, espacios, guiones, paréntesis y un + inicial
+    /** Teléfono o WhatsApp de contacto. */
+    @NormalizeSpaces()
+    @IsString()
+    @IsOptional()
+    @Matches(/^\+?[\d\s()-]{7,20}$/, { message: 'telefono must be a phone number, e.g. +56 9 1234 5678' })
+    telefono?: string;
 
     // Números en el JSON, ej: "lat": -33.4489. Van siempre juntos: lat y lng, o ninguno
     // (eso no se puede expresar con decoradores; lo valida IglesiasService)

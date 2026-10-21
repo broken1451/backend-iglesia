@@ -2,6 +2,13 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 import { Auth } from '../../auth/entities/auth.entity.js';
 import { NoticiaCategoria } from '../interfaces/categoria.enum.js';
+import { camposFaltantes } from '../../common/utils/pendientes.utils.js';
+
+/**
+ * Datos opcionales que debería tener una noticia completa (los obligatorios ya los exige el
+ * esquema). Sin imagen, la tarjeta del sitio muestra solo el ícono de la categoría.
+ */
+export const CAMPOS_FICHA_NOTICIA = ['imagen'] as const;
 
 /**
  * Noticia o comunicado, tal como se guarda en Mongo
@@ -9,8 +16,9 @@ import { NoticiaCategoria } from '../interfaces/categoria.enum.js';
  *
  * Los campos salen del diseño de la tarjeta del sitio.
  * timestamps: Mongoose llena created_at al crear y update_at en cada guardado.
+ * id: false: sin el virtual "id" (repetiría _id ahora que el JSON incluye los virtuales).
  */
-@Schema({ timestamps: { createdAt: 'created_at', updatedAt: 'update_at' } })
+@Schema({ timestamps: { createdAt: 'created_at', updatedAt: 'update_at' }, id: false })
 export class Noticia extends Document {
 
     /** Título de la tarjeta. */
@@ -60,10 +68,18 @@ export class Noticia extends Document {
 
     /** Fecha del último cambio (la llena `timestamps`). */
     update_at: Date;
+
+    /** Campo calculado (no se guarda): los datos de CAMPOS_FICHA_NOTICIA que faltan. [] = completa. */
+    pendientes: string[];
 }
 
 /** Esquema de Mongoose generado a partir de la clase (lo registra NoticiasModule). */
 export const NoticiaSchema = SchemaFactory.createForClass(Noticia);
 
-// Al convertir a JSON para la respuesta, no enviar el campo interno "__v"
-NoticiaSchema.set('toJSON', { versionKey: false });
+// Calcula "pendientes" a partir de lo guardado, cada vez que se lee (no ocupa espacio en Mongo)
+NoticiaSchema.virtual('pendientes').get(function (this: Noticia) {
+    return camposFaltantes(this, CAMPOS_FICHA_NOTICIA);
+});
+
+// Al convertir a JSON para la respuesta: sin el campo interno "__v" y con los virtuales (pendientes)
+NoticiaSchema.set('toJSON', { versionKey: false, virtuals: true });

@@ -15,6 +15,9 @@ Todos los ejemplos de este documento son **requests y respuestas reales**, captu
 - [Iglesias](#iglesias--apiiglesias): [listar](#get-iglesias) · [distritos](#get-iglesiasdistritos) · [ver](#get-iglesiasid) · [crear](#post-iglesias) · [editar](#patch-iglesiasid) · [desactivar](#delete-iglesiasid)
 - [Actividades](#actividades--apiactividades): [listar](#get-actividades) · [ver](#get-actividadesid) · [crear](#post-actividades) · [editar](#patch-actividadesid) · [desactivar](#delete-actividadesid)
 - [Noticias](#noticias--apinoticias): [listar](#get-noticias) · [ver](#get-noticiasid) · [crear](#post-noticias) · [editar](#patch-noticiasid) · [desactivar](#delete-noticiasid)
+- [Pendientes del proyecto](#por-hacer-auth): [Auth](#por-hacer-auth) · [Iglesias](#por-hacer-iglesias) · [Actividades](#por-hacer-actividades) · [Noticias](#por-hacer-noticias) · [Mensajes](#por-hacer-mensajes) · [Resumen](#por-hacer-resumen-del-panel) · [Correo](#por-hacer-correo) · [General](#por-hacer-general)
+- [Mensajes](#mensajes--apimensajes): [enviar (sitio)](#post-mensajes) · [listar](#get-mensajes) · [ver](#get-mensajesid) · [marcar](#patch-mensajesid) · [archivar](#delete-mensajesid)
+- [Resumen del panel](#resumen-del-panel--apiresumen): [pantalla completa](#get-resumen) · [por hacer](#get-resumenpor-hacer)
 - [Salud](#get-api)
 - [Resumen de todos los endpoints](#resumen-de-todos-los-endpoints)
 
@@ -130,6 +133,7 @@ Además de lo que se envía, cada registro trae:
 | `isActive` | `false` si fue desactivado |
 | `created_at` | Fecha de creación (UTC) |
 | `update_at` | Fecha del último cambio (UTC) |
+| `pendientes` | Solo iglesias, actividades y noticias. Los datos que le faltan para estar completo, ej. `["reuniones", "email"]`; `[]` = completo. Se calcula al responder (no se guarda ni se envía). Ver [Por hacer del panel](#get-resumenpor-hacer) |
 
 ---
 
@@ -269,16 +273,16 @@ curl -X POST http://localhost:3500/api/auth/login \
   "accessToken": "eyJhbGciOiJIUzI1NiIsInR5...",
   "expiresIn": 28800,
   "menu": [
-    { "titulo": "Resumen", "icono": "grafico" },
-    { "titulo": "Iglesias", "icono": "templo" },
-    { "titulo": "Noticias", "icono": "diario" },
-    { "titulo": "Actividades", "icono": "calendario" },
-    { "titulo": "Devocional", "icono": "libro" },
-    { "titulo": "Proyectos", "icono": "semilla" },
-    { "titulo": "Directiva", "icono": "usuarios" },
-    { "titulo": "Mensajes", "icono": "bandeja" },
-    { "titulo": "Usuarios y roles", "icono": "llave" },
-    { "titulo": "Configuración", "icono": "ajustes" }
+    { "titulo": "Resumen", "icono": "grafico", "ruta": "resumen" },
+    { "titulo": "Iglesias", "icono": "templo", "ruta": "iglesias" },
+    { "titulo": "Noticias", "icono": "diario", "ruta": "noticias" },
+    { "titulo": "Actividades", "icono": "calendario", "ruta": "actividades" },
+    { "titulo": "Devocional", "icono": "libro", "ruta": "devocional" },
+    { "titulo": "Proyectos", "icono": "semilla", "ruta": "proyectos" },
+    { "titulo": "Directiva", "icono": "usuarios", "ruta": "directiva" },
+    { "titulo": "Mensajes", "icono": "bandeja", "ruta": "mensajes" },
+    { "titulo": "Usuarios y roles", "icono": "llave", "ruta": "usuarios" },
+    { "titulo": "Configuración", "icono": "ajustes", "ruta": "configuracion" }
   ]
 }
 ```
@@ -474,6 +478,19 @@ curl -X DELETE http://localhost:3500/api/auth/6ad75c2ee4515633ec65ee41 \
 
 Se reactiva con `PATCH /auth/:id` y `{ "isActive": true }`.
 
+### Por hacer (Auth)
+
+| Prioridad | Qué | Por qué |
+|:-:|---|---|
+| 🔴 Alta | **Límite de intentos por IP** en `login` y `register` (`@nestjs/throttler`) | El bloqueo es por usuario: no frena a quien prueba una clave común contra muchos correos, ni a quien crea cuentas en masa |
+| 🔴 Alta | **Recuperar contraseña** ("olvidé mi contraseña") con un enlace por correo | Hoy solo un ADMIN puede cambiarla. El envío de correos ya está listo ([correo.md](correo.md)) |
+| 🟡 Media | **Proteger al último ADMIN**: que no pueda quitarse el rol ni desactivarse | Si lo hace, nadie más puede administrar y hay que arreglarlo en Mongo |
+| 🟡 Media | **Cambiar la propia contraseña** (`PATCH /auth/me` con la clave actual y la nueva) | Hoy el usuario depende de un ADMIN para cambiarla |
+| 🟡 Media | **Asociar el usuario a su iglesia o distrito** | Para que IGLESIA edite solo la suya y DISTRITO solo las de su distrito (hoy IGLESIA no edita nada) |
+| 🟢 Baja | Contraseña mínima de **8** caracteres (hoy 6) | Recomendación actual de seguridad |
+| 🟢 Baja | **Paginar y filtrar** `GET /auth` (`?search`, `?roles`, `?isActive=false`) | Hoy devuelve todos los usuarios activos de una vez, y los desactivados solo se ven por id |
+| 🟢 Baja | **Avisar por correo** cuando un ADMIN cambia los roles de alguien | Ejemplo ya escrito en [correo.md](correo.md#agregar-un-correo-nuevo) |
+
 ---
 
 ## Iglesias — `/api/iglesias`
@@ -490,7 +507,9 @@ Directorio de iglesias del sitio.
 | `reuniones` | texto | Horarios, texto libre |
 | `encargado` | texto | Pastor o encargado |
 | `email` | texto | Correo de contacto, en minúsculas |
+| `telefono` | texto | Teléfono o WhatsApp, ej. `"+56 9 1234 5678"` |
 | `lat`, `lng` | número | Coordenadas para el mapa. Siempre las dos o ninguna |
+| `pendientes` | lista | Calculado: cuáles de los 5 datos de una ficha completa faltan (`direccion`, `reuniones`, `encargado`, `email`, `telefono`) |
 
 Más los [campos que agrega la API](#campos-que-agrega-la-api). Los campos opcionales que no se enviaron no aparecen en la respuesta.
 
@@ -507,6 +526,7 @@ Más los [campos que agrega la API](#campos-que-agrega-la-api). Los campos opcio
 | `distrito` | Distrito exacto, sin mayúsculas ni tildes |
 | `search` | Busca en el nombre |
 | `isActive` | `false` lista las desactivadas. **Solo con token de ADMIN, DISTRITO o IGLESIA**; para el resto se ignora y siempre ven las activas |
+| `pendientes` | `true` lista solo las fichas incompletas (les falta dirección, horario, pastor, correo o teléfono). Solo panel, como `isActive` |
 | `limit`, `offset` | [Paginación](#listados-y-paginación) |
 
 **Ejemplo: filtrar**
@@ -535,7 +555,8 @@ curl "http://localhost:3500/api/iglesias?distrito=araucania&search=temuco"
       "lng": -72.5904,
       "isActive": true,
       "created_at": "2026-10-20T12:18:59.287Z",
-      "update_at": "2026-10-20T12:18:59.287Z"
+      "update_at": "2026-10-20T12:18:59.287Z",
+      "pendientes": []
     }
   ]
 }
@@ -644,6 +665,7 @@ No existe, o está desactivada y quien consulta es un visitante → `404`:
 | `reuniones` | texto | | Máx. 250 |
 | `encargado` | texto | | Máx. 150 |
 | `email` | texto | | Email válido. Se guarda en minúsculas |
+| `telefono` | texto | | 7 a 20 caracteres: dígitos, espacios, `()`, `-` y un `+` inicial. Ej. `"+56 9 1234 5678"` |
 | `lat` | número | | Entre -90 y 90. **Junto con `lng`** |
 | `lng` | número | | Entre -180 y 180. **Junto con `lat`** |
 
@@ -673,7 +695,8 @@ curl -X POST http://localhost:3500/api/iglesias \
   "isActive": true,
   "_id": "6ad75c33e4515633ec65ee46",
   "created_at": "2026-10-20T12:18:59.287Z",
-  "update_at": "2026-10-20T12:18:59.287Z"
+  "update_at": "2026-10-20T12:18:59.287Z",
+  "pendientes": []
 }
 ```
 
@@ -767,6 +790,17 @@ curl -X DELETE http://localhost:3500/api/iglesias/6ad75c33e4515633ec65ee4a \
 
 **Errores:** `403` con un rol que no sea ADMIN (incluido DISTRITO), `404` si no existe o ya estaba desactivada.
 
+### Por hacer (Iglesias)
+
+| Prioridad | Qué | Por qué |
+|:-:|---|---|
+| 🔴 Alta | **Volver a proteger `POST /iglesias`** con `@Roles(...MENU.iglesias.editan)` y quitar `@OptionalAuth()` | Hoy cualquiera, sin login, puede crear iglesias en el directorio público |
+| 🟡 Media | **Lista fija de distritos** (un enum o una colección) en vez de texto libre | Un error de tipeo ("Araucania" / "Araucanía ") crea un distrito nuevo en el filtro del sitio |
+| 🟡 Media | **DISTRITO edita solo las iglesias de su distrito** | Hoy un DISTRITO puede editar las de cualquier distrito (requiere asociar usuario y distrito, ver Auth) |
+| 🟢 Baja | Que el nombre único **ignore también las tildes** ("Concepción" = "Concepcion") | Hoy solo ignora mayúsculas (`strength: 2`); con `strength: 1` ignoraría ambas |
+| 🟢 Baja | **Buscar por cercanía** (`?cerca=lat,lng`) con un índice geoespacial | Para "iglesias cerca de mí" en el mapa del sitio |
+| 🟢 Baja | Foto de la iglesia | Campo habitual en un directorio |
+
 ---
 
 ## Actividades — `/api/actividades`
@@ -784,6 +818,8 @@ Calendario de actividades del sitio.
 | `lugar` | texto | 📍 "Temuco" / "En línea" |
 | `distrito` | texto | Etiqueta. `"Nacional"` si es para todos |
 | `inscripcion_url` | texto | Si existe, botón "Inscribirme" |
+| `inscritos` | número | Personas inscritas, cargadas desde el panel. El Resumen suma las de las próximas actividades |
+| `pendientes` | lista | Calculado: cuáles de `descripcion`, `lugar` faltan |
 
 Más los [campos que agrega la API](#campos-que-agrega-la-api).
 
@@ -802,6 +838,7 @@ Más los [campos que agrega la API](#campos-que-agrega-la-api).
 | `distrito` | Exacto, sin mayúsculas ni tildes. `nacional` trae las nacionales |
 | `search` | Busca en el título |
 | `isActive` | `false` lista las desactivadas (solo panel: ADMIN, COMUNICACIONES, DISTRITO, IGLESIA) |
+| `pendientes` | `true` lista solo las que no tienen descripción o lugar (solo panel). Junto con `desde=hoy`, las próximas por completar |
 | `limit`, `offset` | [Paginación](#listados-y-paginación) |
 
 **Ejemplo: próximas actividades para el sitio**
@@ -829,7 +866,8 @@ curl "http://localhost:3500/api/actividades?desde=2026-10-01&limit=10"
       "inscripcion_url": "https://forms.gle/retiro2026",
       "isActive": true,
       "created_at": "2026-10-20T12:18:59.364Z",
-      "update_at": "2026-10-20T12:18:59.364Z"
+      "update_at": "2026-10-20T12:18:59.364Z",
+      "pendientes": []
     },
     {
       "_id": "6ad75c33e4515633ec65ee4f",
@@ -839,7 +877,8 @@ curl "http://localhost:3500/api/actividades?desde=2026-10-01&limit=10"
       "distrito": "Metropolitano",
       "isActive": true,
       "created_at": "2026-10-20T12:18:59.371Z",
-      "update_at": "2026-10-20T12:18:59.371Z"
+      "update_at": "2026-10-20T12:18:59.371Z",
+      "pendientes": ["descripcion"]
     },
     {
       "_id": "6ad75c33e4515633ec65ee4e",
@@ -850,7 +889,8 @@ curl "http://localhost:3500/api/actividades?desde=2026-10-01&limit=10"
       "distrito": "Nacional",
       "isActive": true,
       "created_at": "2026-10-20T12:18:59.367Z",
-      "update_at": "2026-10-20T12:18:59.367Z"
+      "update_at": "2026-10-20T12:18:59.367Z",
+      "pendientes": []
     }
   ]
 }
@@ -897,6 +937,7 @@ Desactivada, consultada por un visitante → `404`:
 | `lugar` | texto | | Máx. 100 |
 | `distrito` | texto | | Máx. 100. Sin él (o vacío) → `"Nacional"` |
 | `inscripcion_url` | texto | | URL válida |
+| `inscritos` | número | | Entero, 0 o más |
 
 **Ejemplo: actividad de varios días con inscripción**
 
@@ -921,7 +962,8 @@ curl -X POST http://localhost:3500/api/actividades \
   "isActive": true,
   "_id": "6ad75c33e4515633ec65ee4d",
   "created_at": "2026-10-20T12:18:59.364Z",
-  "update_at": "2026-10-20T12:18:59.364Z"
+  "update_at": "2026-10-20T12:18:59.364Z",
+  "pendientes": []
 }
 ```
 
@@ -1010,6 +1052,16 @@ curl -X DELETE http://localhost:3500/api/actividades/6ad75c33e4515633ec65ee4d \
 { "message": "Actividad 6ad75c33e4515633ec65ee4d deactivated" }
 ```
 
+### Por hacer (Actividades)
+
+| Prioridad | Qué | Por qué |
+|:-:|---|---|
+| 🟡 Media | **DISTRITO crea y edita solo actividades de su distrito** (o nacionales solo COMUNICACIONES) | Hoy un DISTRITO puede crear actividades de cualquier distrito |
+| 🟡 Media | **Zona horaria real** (`America/Santiago` con `Intl` o una librería) en `?desde` / `?hasta` | Hoy se usan UTC-3 y UTC-4 fijos: el rango puede incluir una hora del día vecino |
+| 🟢 Baja | **Imagen** de la actividad | Las tarjetas del sitio quedarían más vistosas |
+| 🟢 Baja | **Inscripción propia** (formulario y lista de inscritos) en vez de solo un enlace externo | Hoy `inscripcion_url` apunta a un formulario fuera de la API y `inscritos` se carga a mano |
+| 🟢 Baja | Exportar a **calendario** (`GET /actividades/:id.ics`) | Hoy el front arma el enlace de Google Calendar ([guía](guia-de-uso.md#agregar-a-google-calendar)) |
+
 ---
 
 ## Noticias — `/api/noticias`
@@ -1028,6 +1080,7 @@ Noticias y comunicados del sitio.
 | `publicado` | booleano | `false` = borrador, no se ve en el sitio |
 | `fecha_publicacion` | fecha | La fecha de la tarjeta ("16 de marzo de 2026") |
 | `autor` | objeto | `{ "_id", "name", "last_name" }` de quien la creó. Nunca su correo |
+| `pendientes` | lista | Calculado: `["imagen"]` si no tiene imagen |
 
 Más los [campos que agrega la API](#campos-que-agrega-la-api).
 
@@ -1043,6 +1096,7 @@ Más los [campos que agrega la API](#campos-que-agrega-la-api).
 |---|---|
 | `publicado` | `false` lista los borradores (solo panel). Para el resto se ignora y siempre reciben las publicadas |
 | `isActive` | `false` lista las desactivadas, para reactivarlas (solo panel: ADMIN, COMUNICACIONES). Para el resto se ignora |
+| `pendientes` | `true` lista solo las que no tienen imagen (solo panel) |
 | `categoria` | Una de las 4 categorías (escrita exacta, con tilde: `Oraci%C3%B3n` en la URL) |
 | `search` | Busca en el título |
 | `limit`, `offset` | [Paginación](#listados-y-paginación) |
@@ -1072,7 +1126,8 @@ curl http://localhost:3500/api/noticias
       "autor": { "_id": "6ad75c2fe4515633ec65ee43", "name": "carla", "last_name": "prueba" },
       "isActive": true,
       "created_at": "2026-10-20T12:18:59.405Z",
-      "update_at": "2026-10-20T12:18:59.405Z"
+      "update_at": "2026-10-20T12:18:59.405Z",
+      "pendientes": []
     }
   ]
 }
@@ -1102,7 +1157,8 @@ curl "http://localhost:3500/api/noticias?publicado=false" \
       "autor": { "_id": "6ad75c2fe4515633ec65ee43", "name": "carla", "last_name": "prueba" },
       "isActive": true,
       "created_at": "2026-10-20T12:18:59.413Z",
-      "update_at": "2026-10-20T12:18:59.413Z"
+      "update_at": "2026-10-20T12:18:59.413Z",
+      "pendientes": ["imagen"]
     }
   ]
 }
@@ -1133,7 +1189,8 @@ curl http://localhost:3500/api/noticias/6ad75c33e4515633ec65ee50
   "autor": { "_id": "6ad75c2fe4515633ec65ee43", "name": "carla", "last_name": "prueba" },
   "isActive": true,
   "created_at": "2026-10-20T12:18:59.405Z",
-  "update_at": "2026-10-20T12:18:59.405Z"
+  "update_at": "2026-10-20T12:18:59.405Z",
+  "pendientes": []
 }
 ```
 
@@ -1185,7 +1242,8 @@ curl -X POST http://localhost:3500/api/noticias \
   "isActive": true,
   "_id": "6ad75c33e4515633ec65ee50",
   "created_at": "2026-10-20T12:18:59.405Z",
-  "update_at": "2026-10-20T12:18:59.405Z"
+  "update_at": "2026-10-20T12:18:59.405Z",
+  "pendientes": []
 }
 ```
 
@@ -1247,6 +1305,7 @@ curl -X PATCH http://localhost:3500/api/noticias/6ad75c33e4515633ec65ee51 \
   "_id": "6ad75c33e4515633ec65ee51",
   "created_at": "2026-10-20T12:18:59.413Z",
   "update_at": "2026-10-20T12:18:59.448Z",
+  "pendientes": ["imagen"]
   "fecha_publicacion": "2026-10-20T12:18:59.448Z"
 }
 ```
@@ -1269,6 +1328,284 @@ curl -X DELETE http://localhost:3500/api/noticias/6ad75c33e4515633ec65ee51 \
 ```json
 { "message": "Noticia 6ad75c33e4515633ec65ee51 deactivated" }
 ```
+
+### Por hacer (Noticias)
+
+| Prioridad | Qué | Por qué |
+|:-:|---|---|
+| 🔴 Alta | **Definir el formato de `contenido`** (texto, Markdown o HTML) y, si es HTML, **sanitizarlo** al guardar | Si el front lo muestra como HTML sin limpiar, alguien con acceso al panel podría inyectar scripts en el sitio |
+| 🟡 Media | **Subir la imagen** a la API (o a un almacenamiento) en vez de pedir una URL | Hoy hay que alojarla en otro lado y pegar el enlace |
+| 🟡 Media | **Slug** para URLs amigables (`/noticias/aniversario-iglesia-central`) | Mejor para compartir y para buscadores |
+| 🟢 Baja | Registrar **quién editó** por última vez, además del autor | Hoy solo se sabe quién la creó |
+| 🟢 Baja | **Publicación programada** (`fecha_publicacion` futura que se publique sola) | Hoy hay que publicarla a mano en el momento |
+
+### Por hacer (Resumen del panel)
+
+La pantalla [Resumen](#get-resumen) ya entrega las 4 tarjetas, el "Por hacer" (fichas, actividades, mensajes, borradores), los accesos rápidos, la actividad reciente y el avance por distrito. Lo que falta del diseño:
+
+| Prioridad | Qué | Por qué |
+|:-:|---|---|
+| 🟡 Media | **Cambios por aprobar** ("Revisar cambio de Oasis de Esperanza · Traiguén" + botón **Aprobar**) | Requiere que una iglesia proponga cambios a su ficha y un DISTRITO los apruebe: hoy los cambios se guardan directo |
+| 🟡 Media | **Módulo Devocional** ("Escribir 3 reflexiones para los próximos días sin texto") | Está en el menú y en los accesos rápidos, pero no tiene API |
+| 🟡 Media | **Módulo Proyectos** (acceso "Actualizar proyectos") | Igual: está en el menú, sin API |
+| 🟡 Media | **Orden de los distritos** como en el diseño (Norte → Los Ríos) | Hoy van en orden alfabético: no hay una lista de distritos con su orden geográfico (ver Iglesias) |
+| 🟢 Baja | **Inscripciones reales** en vez de cargar `inscritos` a mano | La inscripción hoy es un formulario externo (`inscripcion_url`) que la API no ve |
+| 🟢 Baja | Eventos que no son cambios de datos en "Actividad reciente" ("Comunicaciones activó la transmisión en vivo") | Necesita la sección Configuración con su API |
+| 🟢 Baja | Mostrar el **rol o distrito** en "Actividad reciente" ("Distrito Araucanía actualizó...") | Hoy muestra el nombre de la persona; el distrito requiere asociarlo al usuario (ver Auth) |
+| 🟢 Baja | Que cada IGLESIA vea los pendientes de **su** iglesia | Requiere asociar el usuario a su iglesia (ver Auth) |
+| 🟢 Baja | Borrar el historial antiguo (índice TTL, ej. 1 año) | La colección `historial` crece con cada cambio |
+
+Cada tarea nueva del "Por hacer" se suma con un método en `ResumenService`, sin cambiar la forma de la respuesta.
+
+### Por hacer (Correo)
+
+| Prioridad | Qué | Por qué |
+|:-:|---|---|
+| 🟡 Media | **Cola de envío** persistente (ej. BullMQ con Redis) | Hoy los reintentos viven en memoria: si la app se reinicia a mitad de un reintento, el correo se pierde |
+| 🟢 Baja | **Logo real** de la iglesia en el encabezado | Hoy es una cruz ✝ en un círculo |
+| 🟢 Baja | Más correos: recuperar contraseña, roles actualizados, cuenta desbloqueada | Ver [correo.md](correo.md#agregar-un-correo-nuevo) |
+
+### Por hacer (General)
+
+| Prioridad | Qué | Por qué |
+|:-:|---|---|
+| 🔴 Alta | **Definir `CORS_ORIGINS`** en producción | Sin él, cualquier sitio puede llamar a la API desde el navegador de un usuario |
+| 🟡 Media | **Documentación interactiva** con Swagger (`@nestjs/swagger`) en `/api/docs` | Probar los endpoints desde el navegador, generada desde los DTO |
+| 🟡 Media | **Tests e2e reales** (`test/app.e2e-spec.ts` es el del generador y apunta a `/` en vez de `/api`) | Probar los flujos completos con una base de prueba |
+| 🟢 Baja | `GET /api` que revise también la conexión a Mongo (`@nestjs/terminus`) | Para que el hosting sepa si la API está sana de verdad |
+
+---
+
+## Mensajes — `/api/mensajes`
+
+Mensajes del **formulario de contacto del sitio**. El sitio los envía sin login; el panel los lee y los marca como leídos.
+
+### Objeto mensaje
+
+| Campo | Tipo | Descripción |
+|---|---|---|
+| `nombre` | texto | Quién escribe |
+| `email` | texto | Para responderle, en minúsculas |
+| `telefono` | texto | Opcional |
+| `asunto` | texto | Opcional |
+| `mensaje` | texto | El mensaje |
+| `leido` | booleano | `false` = sin leer: cuenta en la tarjeta "Mensajes sin leer" y en el "Por hacer" |
+| `isActive` | booleano | `false` = archivado |
+| `created_at` | fecha | Cuándo llegó |
+
+### `POST /mensajes`
+
+🌐 **Público** — El formulario de contacto. Responde solo una confirmación (el visitante no recibe el registro guardado).
+
+| Campo | Tipo | Obligatorio | Reglas |
+|---|---|:-:|---|
+| `nombre` | texto | ✅ | Máx. 100 |
+| `email` | texto | ✅ | Email válido |
+| `telefono` | texto | | Mismo formato que el de las iglesias |
+| `asunto` | texto | | Máx. 150 |
+| `mensaje` | texto | ✅ | Máx. 2000 |
+
+```bash
+curl -X POST http://localhost:3500/api/mensajes \
+  -H "Content-Type: application/json" \
+  -d '{"nombre":"Rosa","email":"rosa@correo.cl","mensaje":"¿A qué hora es el culto?"}'
+```
+
+**Respuesta `201`**
+
+```json
+{ "message": "Mensaje recibido" }
+```
+
+### `GET /mensajes`
+
+🔒 **ADMIN, COMUNICACIONES, DISTRITO, IGLESIA** (los que ven "Mensajes" en el menú) — Lista paginada, el más nuevo primero.
+
+| Parámetro | Descripción |
+|---|---|
+| `leido` | `false` = solo los sin leer; `true` = solo los leídos. Sin enviar: todos |
+| `isActive` | `false` lista los archivados |
+| `search` | Busca en nombre, correo y asunto |
+| `limit`, `offset` | [Paginación](#listados-y-paginación) |
+
+### `GET /mensajes/:id`
+
+🔒 Mismos roles — Un mensaje (también archivado).
+
+### `PATCH /mensajes/:id`
+
+🔒 Mismos roles — Solo cambia el estado; lo que escribió el visitante no se edita.
+
+```json
+{ "leido": true }
+```
+
+| Campo | Tipo | Reglas |
+|---|---|---|
+| `leido` | booleano | `true` lo marca como leído; `false`, como nuevo otra vez |
+| `isActive` | booleano | `true` recupera uno archivado |
+
+### `DELETE /mensajes/:id`
+
+🔒 **ADMIN** — Archiva el mensaje (borrado lógico). Responde `{ "message": "Mensaje <id> archived" }`.
+
+### Por hacer (Mensajes)
+
+| Prioridad | Qué | Por qué |
+|:-:|---|---|
+| 🔴 Alta | **Límite de envíos por IP** en `POST /mensajes` (`@nestjs/throttler`) y un captcha en el sitio | Es público: sin límite, un bot puede llenar la bandeja |
+| 🟡 Media | **Responder desde el panel** (envía el correo y marca `respondido`) | Hoy se responde desde el correo propio; el panel solo marca leído |
+| 🟢 Baja | **Avisar por correo** al equipo cuando llega un mensaje | Con [@nestjs/mail](correo.md#agregar-un-correo-nuevo) ya configurado |
+| 🟢 Baja | Dirigir el mensaje a una iglesia o distrito | Hoy todos los mensajes los ven todos los roles del panel |
+
+---
+
+## Resumen del panel — `/api/resumen`
+
+### `GET /resumen`
+
+🔑 **Cualquier usuario con sesión** — **Toda la pantalla Resumen en un solo request**: las 4 tarjetas de números, el "Por hacer", los accesos rápidos, la actividad reciente y el avance de fichas por distrito.
+
+**Cada bloque depende del rol:** lo que el usuario no ve en el menú llega como `null` (el front lo oculta); el "Por hacer" y los accesos rápidos solo incluyen lo que puede hacer.
+
+```bash
+curl http://localhost:3500/api/resumen \
+  -H "Authorization: Bearer TOKEN"
+```
+
+**Respuesta `200`** (ADMIN; basada en una prueba con 3 iglesias, 3 actividades, 2 noticias y 5 mensajes; `actividadReciente` recortada a 3 líneas)
+
+```json
+{
+  "tarjetas": {
+    "fichas": { "completas": 1, "total": 3, "porcentaje": 33, "detalle": "Con dirección, horario, pastor, correo y teléfono" },
+    "mensajes": { "total": 5, "sinLeer": 4 },
+    "actividades": { "proximas": 2, "inscritos": 105 },
+    "noticias": { "publicadas": 1, "borradores": 1 }
+  },
+  "porHacer": {
+    "total": 4,
+    "items": [
+      { "tipo": "completar-iglesias", "seccion": "iglesias", "icono": "templo", "titulo": "Completar 2 fichas de iglesia", "detalle": "Dirección, horario, pastor, correo y teléfono ayudan a que las visiten", "cantidad": 2, "ruta": "iglesias?pendientes=true" },
+      { "tipo": "completar-actividades", "seccion": "actividades", "icono": "calendario", "titulo": "Completar 1 actividad próxima", "detalle": "Descripción y lugar ayudan a que se sumen más personas", "cantidad": 1, "ruta": "actividades?pendientes=true&desde=2026-10-20" },
+      { "tipo": "responder-mensajes", "seccion": "mensajes", "icono": "bandeja", "titulo": "Responder 4 mensajes", "detalle": "Recibidos desde el sitio", "cantidad": 4, "ruta": "mensajes?leido=false" },
+      { "tipo": "terminar-borrador", "seccion": "noticias", "icono": "diario", "titulo": "Terminar el borrador de noticia", "detalle": "Resultados del retiro de jóvenes", "cantidad": 1, "ruta": "noticias/6ad81450c25c93352704b579", "id": "6ad81450c25c93352704b579" }
+    ]
+  },
+  "accesosRapidos": [
+    { "titulo": "Publicar noticia", "icono": "diario", "ruta": "noticias/nueva" },
+    { "titulo": "Crear actividad", "icono": "calendario", "ruta": "actividades/nueva" },
+    { "titulo": "Actualizar proyectos", "icono": "semilla", "ruta": "proyectos" },
+    { "titulo": "Programar devocional", "icono": "libro", "ruta": "devocional" }
+  ],
+  "actividadReciente": [
+    { "fecha": "2026-10-21T01:24:32.621Z", "texto": "Carla Diaz creó el borrador “Resultados del retiro de jóvenes”", "accion": "crear", "seccion": "noticias", "registro": "6ad81450c25c93352704b579", "titulo": "Resultados del retiro de jóvenes" },
+    { "fecha": "2026-10-21T01:24:32.583Z", "texto": "Carla Diaz publicó la noticia “Unánimes a una oración”", "accion": "publicar", "seccion": "noticias", "registro": "6ad81450c25c93352704b577", "titulo": "Unánimes a una oración" },
+    { "fecha": "2026-10-21T01:24:32.534Z", "texto": "Pedro Soto actualizó la ficha de Oasis", "accion": "editar", "seccion": "iglesias", "registro": "6ad81450c25c93352704b56f", "titulo": "Oasis" }
+  ],
+  "avanceDistritos": {
+    "detalle": "Cada ficha completa tiene 5 datos: dirección, horario, pastor, correo y teléfono.",
+    "distritos": [
+      { "distrito": "Araucanía", "iglesias": 1, "porcentaje": 0 },
+      { "distrito": "Valle Central", "iglesias": 2, "porcentaje": 80 }
+    ]
+  }
+}
+```
+
+**Cada bloque, en la pantalla del diseño:**
+
+| Bloque | En pantalla | Cómo se calcula | Lo ven |
+|---|---|---|---|
+| `tarjetas.fichas` | "Fichas completas · **0** de 48" y su barra | Iglesias activas con los 5 datos (`completas`) sobre el total. `porcentaje` = completas / total | Quien ve Iglesias |
+| `tarjetas.mensajes` | "Mensajes sin leer · **3** · 4 en total" | Mensajes no archivados; `sinLeer` = `leido: false` | Quien ve Mensajes |
+| `tarjetas.actividades` | "Próximas actividades · **6** · 105 personas inscritas" | Actividades activas por venir o en curso, y la suma de su campo `inscritos` | Quien ve Actividades |
+| `tarjetas.noticias` | "Noticias publicadas · **4** · 1 en borrador" | Noticias activas publicadas / en borrador | Quien ve Noticias |
+| `porHacer` | Recuadro "Por hacer" | Igual que [`GET /resumen/por-hacer`](#get-resumenpor-hacer) | Según lo que puede editar |
+| `accesosRapidos` | "Publicar noticia", "Crear actividad"... | `ACCESOS_RAPIDOS` en `menu.config.ts`: con API, quien puede editar; sin API (proyectos, devocional), quien ve la sección | Según el rol |
+| `actividadReciente` | "20 oct · Distrito Araucanía actualizó la ficha de..." | Los 5 últimos cambios del historial, de las secciones que ve. `fecha` en UTC: mostrarla con `timeZone: 'America/Santiago'` | Según las secciones que ve |
+| `avanceDistritos` | "Avance de fichas por distrito" | Por distrito: datos llenos / datos posibles. Ej. 5 iglesias × 5 datos = 25; con 3 llenos, **12%**. Así una ficha a medias también suma | Quien ve Iglesias |
+
+`ruta` (en `porHacer` y `accesosRapidos`) es la `ruta` de la sección en el menú, con filtros (`?pendientes=true`) o `/nueva` para el formulario de crear.
+
+### `GET /resumen/por-hacer`
+
+🔑 **Cualquier usuario con sesión** — Solo el recuadro **Por hacer** (para refrescarlo sin pedir toda la pantalla). **Cada usuario recibe solo lo que su rol puede resolver**: si la API le respondería 403 al intentarlo, la tarea no aparece.
+
+| Tarea | Para quién | Cuándo aparece |
+|---|---|---|
+| `completar-iglesias` | DISTRITO, ADMIN | Hay iglesias activas a las que les falta dirección, horario, pastor, correo o teléfono |
+| `completar-actividades` | COMUNICACIONES, DISTRITO, ADMIN | Hay actividades por venir o en curso sin descripción o lugar (las pasadas no cuentan) |
+| `responder-mensajes` | COMUNICACIONES, DISTRITO, IGLESIA, ADMIN | Hay mensajes del sitio sin leer |
+| `terminar-borrador` | COMUNICACIONES, ADMIN | Una tarjeta por borrador de noticia, los 3 últimos editados |
+| `revisar-borradores` | COMUNICACIONES, ADMIN | Si hay más de 3 borradores, una tarjeta con el resto |
+
+IGLESIA solo recibe `responder-mensajes` (es lo único que puede resolver hoy). Quién edita cada sección sale de `editan` en `menu.config.ts` (la misma lista que usan los `@Roles` de POST/PATCH).
+
+```bash
+curl http://localhost:3500/api/resumen/por-hacer \
+  -H "Authorization: Bearer TOKEN"
+```
+
+**Respuesta `200`** (ADMIN; basada en una prueba real, con 2 iglesias incompletas, 1 actividad y 5 borradores)
+
+```json
+{
+  "total": 6,
+  "items": [
+    {
+      "tipo": "completar-iglesias",
+      "seccion": "iglesias",
+      "icono": "templo",
+      "titulo": "Completar 2 fichas de iglesia",
+      "detalle": "Dirección, horario, pastor, correo y teléfono ayudan a que las visiten",
+      "cantidad": 2,
+      "ruta": "iglesias?pendientes=true"
+    },
+    {
+      "tipo": "completar-actividades",
+      "seccion": "actividades",
+      "icono": "calendario",
+      "titulo": "Completar 1 actividad próxima",
+      "detalle": "Descripción y lugar ayudan a que se sumen más personas",
+      "cantidad": 1,
+      "ruta": "actividades?pendientes=true&desde=2026-10-20"
+    },
+    {
+      "tipo": "terminar-borrador",
+      "seccion": "noticias",
+      "icono": "diario",
+      "titulo": "Terminar el borrador de noticia",
+      "detalle": "Resultados del retiro de jóvenes",
+      "cantidad": 1,
+      "ruta": "noticias/6ad80fe6e39aac29a61ce09e",
+      "id": "6ad80fe6e39aac29a61ce09e"
+    },
+    { "tipo": "terminar-borrador", "...": "uno por borrador, hasta 3" },
+    {
+      "tipo": "revisar-borradores",
+      "seccion": "noticias",
+      "icono": "diario",
+      "titulo": "Revisar 2 borradores más",
+      "detalle": "Noticias sin publicar",
+      "cantidad": 2,
+      "ruta": "noticias?publicado=false"
+    }
+  ]
+}
+```
+
+| Campo | Qué es |
+|---|---|
+| `total` | Cantidad de tarjetas: el número del recuadro |
+| `tipo` | Tipo de tarea (tabla de arriba) |
+| `seccion` / `icono` | Sección del menú y su ícono (el mismo del menú) |
+| `titulo` / `detalle` | Las dos líneas de la tarjeta |
+| `cantidad` | A cuántos registros se refiere |
+| `ruta` | Adónde lleva el botón **Ir**: la `ruta` de la sección en el menú, con los mismos filtros que acepta la API. Por ejemplo `iglesias?pendientes=true` → el panel abre su lista de iglesias y llama a `GET /api/iglesias?pendientes=true` |
+| `id` | Solo en `terminar-borrador`: el id de la noticia |
+
+Una sección sin nada pendiente no genera tarjeta. Sin token → `401`.
 
 ---
 
@@ -1310,5 +1647,12 @@ curl http://localhost:3500/api
 | POST | `/api/noticias` | 🔒 COMUNICACIONES | Crear noticia |
 | PATCH | `/api/noticias/:id` | 🔒 COMUNICACIONES | Editar / publicar / reactivar noticia |
 | DELETE | `/api/noticias/:id` | 🔒 ADMIN | Desactivar noticia |
+| POST | `/api/mensajes` | 🌐 | Formulario de contacto del sitio |
+| GET | `/api/mensajes` | 🔒 roles del menú Mensajes | Listar mensajes |
+| GET | `/api/mensajes/:id` | 🔒 roles del menú Mensajes | Ver mensaje |
+| PATCH | `/api/mensajes/:id` | 🔒 roles del menú Mensajes | Marcar leído / recuperar |
+| DELETE | `/api/mensajes/:id` | 🔒 ADMIN | Archivar mensaje |
+| GET | `/api/resumen` | 🔑 | Toda la pantalla Resumen del panel, según el rol |
+| GET | `/api/resumen/por-hacer` | 🔑 | Solo el recuadro "Por hacer" |
 
 ADMIN puede usar todos los 🔒.

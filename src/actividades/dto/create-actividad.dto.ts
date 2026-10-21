@@ -1,4 +1,4 @@
-import { IsISO8601, IsNotEmpty, IsOptional, IsString, IsUrl, MaxLength } from "class-validator";
+import { IsInt, IsISO8601, IsNotEmpty, IsOptional, IsString, IsUrl, MaxLength, Min } from "class-validator";
 import { NormalizeSpaces } from "../../common/transforms/normalize-spaces.transform.js";
 
 /**
@@ -47,4 +47,10 @@ export class CreateActividadDto {
     @IsUrl()
     @IsOptional()
     inscripcion_url?: string;
+
+    /** Personas inscritas (se cargan desde el panel). Lo suma el Resumen del panel. */
+    @IsInt()
+    @Min(0)
+    @IsOptional()
+    inscritos?: number;
 }

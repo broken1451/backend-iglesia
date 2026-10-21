@@ -25,7 +25,7 @@ export class IglesiasController {
   constructor(private readonly iglesiasService: IglesiasService) {}
 
   /**
-   * GET /api/iglesias — Lista paginada. Filtros: ?distrito, ?search, ?isActive, ?limit, ?offset.
+   * GET /api/iglesias — Lista paginada. Filtros: ?distrito, ?search, ?isActive, ?pendientes, ?limit, ?offset.
    * hasMenuAccess decide si quien consulta puede ver también las desactivadas.
    */
   // Visitante (o rol sin acceso a Iglesias): solo activas.
@@ -62,24 +62,25 @@ export class IglesiasController {
    * ⚠ ESTADO ACTUAL: ABIERTO A CUALQUIERA, SIN LOGIN. El @Roles(ValidRoles.distrito) está
    * comentado y @OptionalAuth() anula el @Roles de la clase. Lo previsto (y lo que dice
    * docs/seguridad.md) es que solo DISTRITO y ADMIN puedan crear: para eso, descomentar
-   * @Roles(ValidRoles.distrito) y quitar @OptionalAuth().
+   * @Roles(...MENU.iglesias.editan) y quitar @OptionalAuth().
    */
   // Crear y editar: además, rol DISTRITO (ADMIN siempre pasa)
-  // @Roles(ValidRoles.distrito)
+  // @Roles(...MENU.iglesias.editan)
   @OptionalAuth()
   @Post()
-  create(@Body() createIglesiaDto: CreateIglesiaDto) {
-    return this.iglesiasService.create(createIglesiaDto);
+  create(@Body() createIglesiaDto: CreateIglesiaDto, @CurrentUser() user: Auth | null) {
+    return this.iglesiasService.create(createIglesiaDto, user);
   }
 
   /**
    * PATCH /api/iglesias/:id — Edita una iglesia o la reactiva con { "isActive": true }.
    * Solo DISTRITO (y ADMIN, que pasa siempre).
    */
-  @Roles(ValidRoles.distrito)
+  // MENU.iglesias.editan = DISTRITO
+  @Roles(...MENU.iglesias.editan)
   @Patch(':id')
-  update(@Param('id', ParseMongoIdPipe) id: string, @Body() updateIglesiaDto: UpdateIglesiaDto) {
-    return this.iglesiasService.update(id, updateIglesiaDto);
+  update(@Param('id', ParseMongoIdPipe) id: string, @Body() updateIglesiaDto: UpdateIglesiaDto, @CurrentUser() user: Auth) {
+    return this.iglesiasService.update(id, updateIglesiaDto, user);
   }
 
   /**
@@ -87,7 +88,7 @@ export class IglesiasController {
    */
   @Roles(ValidRoles.admin)
   @Delete(':id')
-  remove(@Param('id', ParseMongoIdPipe) id: string) {
-    return this.iglesiasService.remove(id);
+  remove(@Param('id', ParseMongoIdPipe) id: string, @CurrentUser() user: Auth) {
+    return this.iglesiasService.remove(id, user);
   }
 }

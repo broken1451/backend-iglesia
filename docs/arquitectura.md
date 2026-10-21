@@ -21,6 +21,7 @@ src/
 │   ├── transforms/to-boolean.transform.ts      "true"/"false" de la URL → boolean
 │   ├── transforms/normalize-spaces.transform.ts "  a   b " → "a b"
 │   ├── utils/mongo.utils.ts            Búsqueda sin tildes, duplicados, paginación
+│   ├── utils/pendientes.utils.ts       Qué datos le faltan a un registro (campo "pendientes")
 │   └── utils/texto.utils.ts            capitalizar("josé muñoz") → "José Muñoz"
 │
 ├── auth/                       Usuarios, login y permisos → ver seguridad.md
@@ -28,7 +29,10 @@ src/
 ├── iglesias/                   Directorio de iglesias
 ├── actividades/                Calendario de actividades
 ├── noticias/                   Noticias y comunicados
-└── correo/                     Envío de correos (@nestjs/mail) → ver correo.md
+├── mensajes/                   Formulario de contacto del sitio
+├── historial/                  Quién cambió qué ("Actividad reciente"); sin rutas propias
+├── correo/                     Envío de correos (@nestjs/mail) → ver correo.md
+└── resumen/                    Pantalla Resumen del panel: tarjetas, Por hacer, accesos, actividad, avance
 ```
 
 Cada módulo de negocio (`iglesias`, `actividades`, `noticias`) tiene la misma forma:
@@ -174,6 +178,32 @@ Noticias y comunicados del sitio.
 - **El listado no trae `contenido`** (el texto completo): las tarjetas solo usan `resumen`, y así la respuesta pesa mucho menos. El detalle (`/:id`) sí lo trae.
 - El panel lista las desactivadas con `?isActive=false`, igual que en iglesias y actividades.
 
+### Mensajes
+El formulario de contacto del sitio (`POST /api/mensajes`, público). El panel los lista, los marca como leídos (`leido`) y los archiva. Lo que escribió el visitante no se edita: el `UpdateMensajeDto` solo acepta `leido` e `isActive`. El `POST` responde solo "Mensaje recibido", sin devolver el registro.
+
+### Historial ("Actividad reciente")
+Los servicios de iglesias, actividades y noticias **anotan cada cambio** con `HistorialService.anotar()`: qué se hizo (`crear`, `editar`, `publicar`, `desactivar`, `reactivar`), en qué sección, sobre qué registro, con su título **de ese momento** y quién lo hizo (el usuario del token, que el controller pasa al servicio).
+- **Por qué una colección propia** y no mirar `update_at` de cada registro: así queda cada cambio (no solo el último), quién lo hizo, y el título aunque después lo renombren.
+- **Qué acción se anota** al editar: `accionAlEditar()` compara antes y después; un PATCH con `{ "isActive": false }` cuenta como "desactivó", y uno que publica un borrador, como "publicó".
+- **Nunca rompe la operación:** si anotar falla, solo queda un aviso en el log; el cambio ya se guardó.
+- El texto ("Ana Rojas actualizó la ficha de Luz de Esperanza") se arma al leer, en `recientes()`: cambiar las frases (`FRASES`) no requiere migrar datos.
+
+### Pantalla Resumen
+`GET /api/resumen` arma toda la pantalla en un request. `ResumenService` no tiene datos propios: pide a cada servicio sus números (`avancePorDistrito()`, `contar()`, `proximas()`...) **en paralelo**, y la consulta de una sección que el usuario no ve ni se hace (su bloque llega en `null`).
+- **Avance por distrito** en una sola agregación de Mongo: por iglesia cuenta cuántos de los 5 datos tiene, y por distrito suma iglesias, fichas completas y datos llenos. El porcentaje es datos llenos / datos posibles, así una ficha a medias también suma avance.
+- **Accesos rápidos:** `ACCESOS_RAPIDOS` en `menu.config.ts`.
+
+### Pendientes y "Por hacer"
+El recuadro **Por hacer** del panel (pantalla Resumen) muestra lo que falta completar. Se arma en tres capas:
+
+1. **Cada entidad declara su "ficha completa"**: `CAMPOS_FICHA_IGLESIA = ['direccion', 'reuniones', 'encargado', 'email', 'telefono']`, `CAMPOS_FICHA_ACTIVIDAD = ['descripcion', 'lugar']`, `CAMPOS_FICHA_NOTICIA = ['imagen']`.
+2. **Campo virtual `pendientes`** en cada registro: Mongoose lo calcula al responder (`["email"]`, o `[]` si está completo). **Por qué virtual:** no se guarda, así nunca queda desactualizado al editar. Como el JSON ahora incluye virtuales, los esquemas usan `id: false` para no repetir `_id` como `id`.
+3. **Filtro `?pendientes=true`** en los listados (solo panel) y **`GET /api/resumen/por-hacer`**: `ResumenService` pide a cada servicio sus conteos (`contarIncompletas()`, `borradores()`) y arma las tarjetas.
+
+**Quién ve qué:** `puedeEditar()` revisa `editan` del menú. Así, a un IGLESIA no se le propone "Completar fichas de iglesia" si la API le respondería 403 al intentarlo. Para agregar un tipo de tarea nuevo (devocional, cambios por aprobar) basta un método más en `ResumenService`.
+
+`ResumenModule` no tiene modelo propio: importa los módulos de iglesias, actividades, noticias, mensajes e historial, que exportan sus servicios.
+
 ### Correo
 Envío de correos con `@nestjs/mail`; hoy, la bienvenida al registrarse. Detalle completo en [correo.md](correo.md).
 - **Una clase por correo** (`correo/mails/*.mail.ts`) que devuelve asunto, plantilla y datos; **una plantilla HTML** por correo (`correo/templates/*.html`), todas envueltas por `layout.html` (encabezado y pie comunes).
@@ -190,6 +220,9 @@ yarn test
 - `common/utils/mongo.utils.spec.ts`: búsqueda sin tildes, escape de caracteres especiales, `definedOnly`.
 - `iglesias/iglesias.service.spec.ts`: visitante vs. panel, coordenadas, duplicados, que un PATCH no pise campos. Usa un modelo de Mongo simulado, no necesita base de datos.
 - `iglesias/iglesias.controller.spec.ts`: que cada rol reciba la vista correcta.
+- `resumen/resumen.service.spec.ts`: la pantalla completa (números de las tarjetas, bloques en `null` según el rol, accesos rápidos), qué tareas recibe cada rol, textos ("48 fichas" / "1 actividad próxima") y el corte de 3 borradores.
+- `historial/historial.service.spec.ts`: el texto de cada línea ("Ana Rojas actualizó la ficha de..."), que nunca lance error y qué acción se anota al editar.
+- `common/utils/pendientes.utils.spec.ts`: qué cuenta como vacío, el filtro de Mongo y la frase "Horario, dirección y correo".
 - `auth/auth.service.spec.ts`: login (mismo 401 para correo inexistente y clave mala, bloqueo, desbloqueo), registro (minúsculas, hash, bienvenida en segundo plano, duplicados) y edición. Usa un `PasswordHasher` real pero barato, así compara hashes de verdad.
 - `correo/mails/bienvenida.mail.spec.ts`: renderiza la bienvenida con las plantillas reales y `InMemoryMailTransport` (nombre, escape de HTML, botón del panel).
 - `correo/correo.transport.spec.ts`: qué transporte se arma según la configuración, y que `EnvioConCopia` guarde la copia solo si el envío salió.

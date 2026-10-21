@@ -3,6 +3,7 @@ import { getModelToken } from '@nestjs/mongoose';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { IglesiasService } from './iglesias.service.js';
 import { Iglesia } from './entities/iglesia.entity.js';
+import { HistorialService } from '../historial/historial.service.js';
 
 // Modelo de Mongoose falso: find() devuelve una cadena .sort().skip().limit()
 const createModelMock = () => {
@@ -22,11 +23,17 @@ const createModelMock = () => {
 describe('IglesiasService', () => {
   let service: IglesiasService;
   let model: ReturnType<typeof createModelMock>;
+  // Historial falso: solo registra qué se anotó
+  const historial = { anotar: vi.fn() };
 
   beforeEach(async () => {
     model = createModelMock();
     const module: TestingModule = await Test.createTestingModule({
-      providers: [IglesiasService, { provide: getModelToken(Iglesia.name), useValue: model }],
+      providers: [
+        IglesiasService,
+        { provide: getModelToken(Iglesia.name), useValue: model },
+        { provide: HistorialService, useValue: historial },
+      ],
     }).compile();
 
     service = module.get<IglesiasService>(IglesiasService);
@@ -41,6 +48,17 @@ describe('IglesiasService', () => {
     it('el panel puede pedir las desactivadas', async () => {
       await service.findAll({ isActive: false }, true);
       expect(model.find).toHaveBeenCalledWith({ isActive: false });
+    });
+
+    it('?pendientes=true: el panel ve las fichas incompletas; a un visitante se le ignora', async () => {
+      await service.findAll({ pendientes: true }, true);
+      expect(model.find.mock.calls[0][0]).toEqual({
+        isActive: true,
+        $or: ['direccion', 'reuniones', 'encargado', 'email', 'telefono'].map((campo) => ({ [campo]: { $in: [null, ''] } })),
+      });
+
+      await service.findAll({ pendientes: true }, false);
+      expect(model.find.mock.calls[1][0]).toEqual({ isActive: true });
     });
 
     it('filtra distrito exacto y nombre sin tildes', async () => {
@@ -80,20 +98,20 @@ describe('IglesiasService', () => {
     });
 
     it('rechaza un PATCH que deja media coordenada', async () => {
-      model.findById.mockResolvedValue({ lat: undefined, lng: undefined, set: vi.fn(), save: vi.fn() });
+      model.findById.mockResolvedValue({ lat: undefined, lng: undefined, set: vi.fn(), save: vi.fn().mockResolvedValue(undefined) });
       await expect(service.update('abc', { lat: -33.4 })).rejects.toThrow(BadRequestException);
     });
 
     it('permite cambiar solo lat si ya tenía lng guardada', async () => {
-      const iglesia = { lat: -33, lng: -70, set: vi.fn(), save: vi.fn().mockResolvedValue('ok') };
+      const iglesia = { lat: -33, lng: -70, set: vi.fn(), save: vi.fn().mockResolvedValue(undefined) };
       model.findById.mockResolvedValue(iglesia);
-      await expect(service.update('abc', { lat: -33.4 })).resolves.toBe('ok');
+      await expect(service.update('abc', { lat: -33.4 })).resolves.toBe(iglesia);
     });
 
     it('permite borrar la ubicación con ambas en null', async () => {
-      const iglesia = { lat: -33, lng: -70, set: vi.fn(), save: vi.fn().mockResolvedValue('ok') };
+      const iglesia = { lat: -33, lng: -70, set: vi.fn(), save: vi.fn().mockResolvedValue(undefined) };
       model.findById.mockResolvedValue(iglesia);
-      await expect(service.update('abc', { lat: null, lng: null } as never)).resolves.toBe('ok');
+      await expect(service.update('abc', { lat: null, lng: null } as never)).resolves.toBe(iglesia);
     });
   });
 
@@ -105,9 +123,31 @@ describe('IglesiasService', () => {
   });
 
   it('update no pisa campos que no se enviaron', async () => {
-    const iglesia = { set: vi.fn(), save: vi.fn() };
+    const iglesia = { set: vi.fn(), save: vi.fn().mockResolvedValue(undefined) };
     model.findById.mockResolvedValue(iglesia);
     await service.update('abc', { reuniones: 'Dom 11:00', name: undefined } as never);
     expect(iglesia.set).toHaveBeenCalledWith({ reuniones: 'Dom 11:00' });
+  });
+
+  describe('historial', () => {
+    const usuario = { _id: 'u1' } as never;
+
+    it('crear anota quién agregó la iglesia', async () => {
+      model.create.mockResolvedValue({ _id: 'i1', name: 'Luz de Esperanza' });
+      await service.create({ distrito: 'Norte', name: 'Luz de Esperanza' }, usuario);
+      expect(historial.anotar).toHaveBeenCalledWith(
+        expect.objectContaining({ accion: 'crear', seccion: 'iglesias', titulo: 'Luz de Esperanza', usuario }),
+      );
+    });
+
+    it('un PATCH con { isActive: false } se anota como desactivar, no como editar', async () => {
+      const iglesia = {
+        name: 'Central', isActive: true, save: vi.fn().mockResolvedValue(undefined),
+        set(this: { isActive: boolean }, cambios: { isActive?: boolean }) { Object.assign(this, cambios); },
+      };
+      model.findById.mockResolvedValue(iglesia);
+      await service.update('abc', { isActive: false }, usuario);
+      expect(historial.anotar).toHaveBeenLastCalledWith(expect.objectContaining({ accion: 'desactivar' }));
+    });
   });
 });

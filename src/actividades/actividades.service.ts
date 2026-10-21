@@ -4,7 +4,11 @@ import { Model, type QueryFilter } from 'mongoose';
 import { CreateActividadDto } from './dto/create-actividad.dto.js';
 import { UpdateActividadDto } from './dto/update-actividad.dto.js';
 import { FindActividadesDto } from './dto/find-actividades.dto.js';
-import { Actividad, DISTRITO_NACIONAL } from './entities/actividad.entity.js';
+import { Actividad, CAMPOS_FICHA_ACTIVIDAD, DISTRITO_NACIONAL } from './entities/actividad.entity.js';
+import { faltaAlguno } from '../common/utils/pendientes.utils.js';
+import { HistorialService, accionAlEditar } from '../historial/historial.service.js';
+import { AccionHistorial } from '../historial/entities/historial.entity.js';
+import type { Auth } from '../auth/entities/auth.entity.js';
 import { containsRegex, definedOnly, equalsRegex, paginated } from '../common/utils/mongo.utils.js';
 
 /**
@@ -14,20 +18,28 @@ import { containsRegex, definedOnly, equalsRegex, paginated } from '../common/ut
 @Injectable()
 export class ActividadesService {
 
-  /** @param actividadModel modelo de Mongo de las actividades */
-  constructor(@InjectModel(Actividad.name) private readonly actividadModel: Model<Actividad>) {}
+  /**
+   * @param actividadModel modelo de Mongo de las actividades
+   * @param historial      anota cada cambio para "Actividad reciente" del panel
+   */
+  constructor(
+    @InjectModel(Actividad.name) private readonly actividadModel: Model<Actividad>,
+    private readonly historial: HistorialService,
+  ) {}
 
   /**
    * Crea una actividad. Si no viene distrito (o viene vacío), queda como "Nacional".
    * @returns la actividad creada
    * @throws BadRequestException (400) si fecha_fin es anterior a fecha_inicio
    */
-  create(createActividadDto: CreateActividadDto) {
+  async create(createActividadDto: CreateActividadDto, usuario?: Auth | null) {
     checkFechas(createActividadDto.fecha_inicio, createActividadDto.fecha_fin);
-    return this.actividadModel.create({
+    const actividad = await this.actividadModel.create({
       ...definedOnly(createActividadDto),
       distrito: createActividadDto.distrito?.trim() || DISTRITO_NACIONAL,
     });
+    await this.historial.anotar({ accion: AccionHistorial.crear, seccion: 'actividades', registro: actividad, titulo: actividad.titulo, usuario });
+    return actividad;
   }
 
   /**
@@ -41,13 +53,14 @@ export class ActividadesService {
    *     incluye todo ese día en hora de Chile)
    *   - distrito: exacto, sin tildes ni mayúsculas ("Nacional" trae las nacionales)
    *   - search: en el título, sin tildes ni mayúsculas
+   *   - pendientes: solo las que tienen datos por completar (solo panel)
    *   - isActive, limit, offset
    * @param verInactivas true solo para roles que gestionan actividades. Si es false,
    *   siempre devuelve solo activas aunque se pida ?isActive=false.
    * @returns { total, limit, offset, data }
    */
   // Ordenadas por fecha: el front las agrupa por mes tal como vienen
-  async findAll({ desde, hasta, distrito, search, isActive, limit = 20, offset = 0 }: FindActividadesDto, verInactivas = false) {
+  async findAll({ desde, hasta, distrito, search, isActive, pendientes, limit = 20, offset = 0 }: FindActividadesDto, verInactivas = false) {
     // Quien no gestiona actividades solo ve las activas, pida lo que pida en ?isActive=
     const filter: QueryFilter<Actividad> = { isActive: verInactivas ? (isActive ?? true) : true };
     if (distrito) filter.distrito = equalsRegex(distrito);
@@ -55,12 +68,11 @@ export class ActividadesService {
     if (hasta) filter.fecha_inicio = { $lte: finDelDia(hasta) };
     if (desde) {
       // Sigue vigente si termina después de "desde" (o, sin fecha_fin, si empieza después)
-      const inicio = inicioDelDia(desde);
-      filter.$or = [
-        { fecha_fin: { $gte: inicio } },
-        { fecha_fin: null, fecha_inicio: { $gte: inicio } },
-      ];
+      Object.assign(filter, vigentesDesde(inicioDelDia(desde)));
     }
+    // Actividades incompletas, para el botón "Ir" del Por hacer (solo panel). Va dentro de $and
+    // porque ?desde también usa $or y uno pisaría al otro
+    if (pendientes && verInactivas) filter.$and = [faltaAlguno(CAMPOS_FICHA_ACTIVIDAD)];
 
     // La página y el total se piden a la vez para no esperar dos viajes a Mongo
     const [data, total] = await Promise.all([
@@ -68,6 +80,32 @@ export class ActividadesService {
       this.actividadModel.countDocuments(filter),
     ]);
     return paginated(data, total, limit, offset);
+  }
+
+  /**
+   * Cuántas actividades activas y por venir (o en curso) tienen datos por completar.
+   * Las pasadas no cuentan: ya no tiene sentido completarlas. Lo usa el "Por hacer" del panel.
+   */
+  contarIncompletas() {
+    return this.actividadModel.countDocuments({
+      isActive: true,
+      $and: [vigentesDesde(new Date()), faltaAlguno(CAMPOS_FICHA_ACTIVIDAD)],
+    });
+  }
+
+  /**
+   * Para el Resumen del panel ("6 próximas actividades · 105 personas inscritas"): las
+   * actividades activas por venir o en curso, y la suma de sus inscritos.
+   * @returns { proximas, inscritos }
+   */
+  async proximas() {
+    const [resultado] = await this.actividadModel.aggregate<{ proximas: number; inscritos: number }>([
+      { $match: { isActive: true, ...vigentesDesde(new Date()) } },
+      { $group: { _id: null, proximas: { $sum: 1 }, inscritos: { $sum: { $ifNull: ['$inscritos', 0] } } } },
+      { $project: { _id: 0, proximas: 1, inscritos: 1 } },
+    ]);
+    // Sin actividades próximas, el $group no devuelve ninguna fila
+    return resultado ?? { proximas: 0, inscritos: 0 };
   }
 
   /**
@@ -92,7 +130,7 @@ export class ActividadesService {
    * @throws NotFoundException (404) si no existe
    * @throws BadRequestException (400) si las fechas quedarían al revés
    */
-  async update(id: string, updateActividadDto: UpdateActividadDto) {
+  async update(id: string, updateActividadDto: UpdateActividadDto, usuario?: Auth | null) {
     // Sin filtro isActive: así un ADMIN puede reactivarla con { "isActive": true }
     const actividad = await this.actividadModel.findById(id);
     if (!actividad) throw new NotFoundException(`Actividad with id ${id} not found`);
@@ -105,8 +143,11 @@ export class ActividadesService {
     // (ej. cambiar solo fecha_fin a una anterior a la fecha_inicio guardada)
     checkFechas(changes.fecha_inicio ?? actividad.fecha_inicio, changes.fecha_fin ?? actividad.fecha_fin);
 
+    const antes = { isActive: actividad.isActive };
     actividad.set(changes);
-    return actividad.save();
+    await actividad.save();
+    await this.historial.anotar({ accion: accionAlEditar(antes, actividad), seccion: 'actividades', registro: actividad, titulo: actividad.titulo, usuario });
+    return actividad;
   }
 
   /**
@@ -114,11 +155,12 @@ export class ActividadesService {
    * reactivar con PATCH { "isActive": true }.
    * @throws NotFoundException (404) si no existe o ya estaba desactivada
    */
-  async remove(id: string) {
+  async remove(id: string, usuario?: Auth | null) {
     // Borrado lógico
     const actividad = await this.findOne(id);
     actividad.isActive = false;
     await actividad.save();
+    await this.historial.anotar({ accion: AccionHistorial.desactivar, seccion: 'actividades', registro: actividad, titulo: actividad.titulo, usuario });
     return { message: `Actividad ${id} deactivated` };
   }
 }
@@ -134,6 +176,14 @@ const checkFechas = (inicio: string | Date, fin?: string | Date | null) => {
     throw new BadRequestException('fecha_fin must be after fecha_inicio');
   }
 };
+
+/**
+ * Filtro: actividades que siguen vigentes desde esa fecha. Termina después (o, sin
+ * fecha_fin, empieza después): incluye el 2º día de un retiro que empezó antes.
+ */
+const vigentesDesde = (fecha: Date) => ({
+  $or: [{ fecha_fin: { $gte: fecha } }, { fecha_fin: null, fecha_inicio: { $gte: fecha } }],
+});
 
 /** Solo la fecha, sin hora: "2026-12-31". */
 const SOLO_FECHA = /^\d{4}-\d{2}-\d{2}$/;

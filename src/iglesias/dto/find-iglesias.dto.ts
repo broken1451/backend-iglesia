@@ -21,4 +21,11 @@ export class FindIglesiasDto extends PaginationDto {
     @IsBoolean()
     @IsOptional()
     isActive?: boolean;
+
+    // Solo para el panel: ?pendientes=true lista los que tienen datos por completar (ver "pendientes")
+    /** El servicio lo ignora si quien consulta no gestiona iglesias. */
+    @ToBoolean()
+    @IsBoolean()
+    @IsOptional()
+    pendientes?: boolean;
 }

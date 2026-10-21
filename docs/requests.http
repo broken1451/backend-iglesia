@@ -10,6 +10,8 @@
 @usuarioId = {{registrarUsuario.response.body.user._id}}
 @iglesiaId = {{crearIglesia.response.body._id}}
 @actividadId = {{crearActividad.response.body._id}}
+# Pon aquí el _id de un mensaje (GET /mensajes) para marcarlo o archivarlo
+@mensajeId = 
 @noticiaId = {{crearBorrador.response.body._id}}
 
 ######## AUTH ########
@@ -126,6 +128,12 @@ GET {{baseUrl}}/iglesias?distrito=araucania&search=temuco
 ### Iglesias · Listar desactivadas (panel)
 # Con token de ADMIN, DISTRITO o IGLESIA. Sin token se ignora isActive.
 GET {{baseUrl}}/iglesias?isActive=false
+Authorization: Bearer {{token}}
+
+
+### Iglesias · Fichas incompletas (panel)
+# Con token de ADMIN, DISTRITO o IGLESIA: solo las iglesias sin horario, dirección o correo.
+GET {{baseUrl}}/iglesias?pendientes=true
 Authorization: Bearer {{token}}
 
 
@@ -388,6 +396,52 @@ Content-Type: application/json
 
 
 ######## SALUD ########
+
+### Mensajes · Enviar mensaje (sitio)
+# Público: el formulario de contacto del sitio.
+POST {{baseUrl}}/mensajes
+Content-Type: application/json
+
+{
+  "nombre": "Rosa",
+  "email": "rosa@correo.cl",
+  "mensaje": "¿A qué hora es el culto?"
+}
+
+
+### Mensajes · Listar sin leer
+# Roles que ven Mensajes en el menú.
+GET {{baseUrl}}/mensajes?leido=false
+Authorization: Bearer {{token}}
+
+
+### Mensajes · Marcar leído
+PATCH {{baseUrl}}/mensajes/{{mensajeId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "leido": true
+}
+
+
+### Mensajes · Archivar mensaje
+# Solo ADMIN.
+DELETE {{baseUrl}}/mensajes/{{mensajeId}}
+Authorization: Bearer {{token}}
+
+
+### Resumen · Pantalla completa
+# Cualquier usuario con sesión. Todos los bloques de la pantalla Resumen, según el rol.
+GET {{baseUrl}}/resumen
+Authorization: Bearer {{token}}
+
+
+### Resumen · Por hacer
+# Cualquier usuario con sesión. Las tarjetas del recuadro "Por hacer" según el rol.
+GET {{baseUrl}}/resumen/por-hacer
+Authorization: Bearer {{token}}
+
 
 ### Salud · API arriba
 # Responde "Hello World!".

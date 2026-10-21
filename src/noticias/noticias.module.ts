@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { HistorialModule } from '../historial/historial.module.js';
 import { NoticiasService } from './noticias.service.js';
 import { NoticiasController } from './noticias.controller.js';
 import { Noticia, NoticiaSchema } from './entities/noticia.entity.js';
@@ -11,7 +12,11 @@ import { Noticia, NoticiaSchema } from './entities/noticia.entity.js';
 @Module({
   controllers: [NoticiasController],
   providers: [NoticiasService],
+  // Exportado para el "Por hacer" del panel (ResumenModule)
+  exports: [NoticiasService],
   imports: [
+    // Cada cambio se anota en el historial ("Actividad reciente" del panel)
+    HistorialModule,
     // Registra el modelo Noticia. El nombre de la colección sale de config.yaml
     // (mongo.collectionNameNoticia); si no está definido, usa "noticias"
     MongooseModule.forFeatureAsync([
