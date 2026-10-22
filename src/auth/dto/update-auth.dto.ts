@@ -6,8 +6,11 @@ import { ValidRoles } from '../interfaces/role.enum.js';
 /**
  * Body de PATCH /api/auth/:id (solo ADMIN).
  *
- * PartialType copia todos los campos del registro (name, last_name, email, password)
+ * PartialType copia todos los campos del registro (name, last_name, email, password, iglesia)
  * con sus validaciones, pero opcionales. Además agrega lo que solo un ADMIN puede cambiar.
+ *
+ * iglesia: un _id la asigna o la cambia; null la quita. Un usuario IGLESIA sin iglesia no
+ * puede hacer login (lo revisa AuthService.login).
  */
 export class UpdateAuthDto extends PartialType(CreateAuthDto) {
 

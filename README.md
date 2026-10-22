@@ -13,7 +13,7 @@ Hecha con **NestJS 12**, **MongoDB** (Mongoose) y los módulos oficiales `@nestj
 | [docs/seguridad.md](docs/seguridad.md) | Login, tokens, roles, menú y quién puede hacer qué (y por qué) |
 | [docs/correo.md](docs/correo.md) | Envío de correos: configuración (desarrollo y SMTP), plantillas y cómo agregar un correo nuevo |
 | [docs/arquitectura.md](docs/arquitectura.md) | Estructura de carpetas, el camino de un request y las decisiones de diseño |
-| [docs/iglesia.postman_collection.json](docs/iglesia.postman_collection.json) | Colección de Postman con los 64 requests listos (el login guarda el token solo) |
+| [docs/iglesia.postman_collection.json](docs/iglesia.postman_collection.json) | Colección de Postman con los 65 requests listos (el login guarda el token solo) |
 | [docs/requests.http](docs/requests.http) | Los mismos requests para la extensión REST Client de VS Code |
 
 ## Puesta en marcha
@@ -72,7 +72,10 @@ yarn start:dev
 La API queda en `http://localhost:3500/api` (el puerto se define en `src/conf/config.yaml`).
 
 ### 4. Crear el primer administrador
-El registro público siempre crea usuarios con rol `IGLESIA`. Regístrate con `POST /api/auth/register` y luego súbete a ADMIN directamente en Mongo:
+El registro público siempre crea usuarios con rol `IGLESIA` (la iglesia es opcional; un IGLESIA sin iglesia no puede hacer login). Con la base vacía:
+
+1. Regístrate con `POST /api/auth/register` (sin `iglesia`).
+2. Súbete a ADMIN directamente en Mongo (un ADMIN no necesita iglesia):
 
 ```bash
 docker exec IGLESIA_CONTAINER mongosh iglesia --eval 'db.users.updateOne({email:"tu@correo.cl"},{$set:{roles:["ADMIN"]}})'

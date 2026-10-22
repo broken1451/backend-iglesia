@@ -51,7 +51,7 @@ export class AuthController {
   @Roles()
   @Get('me')
   me(@CurrentUser() user: Auth) {
-    return user;
+    return this.authService.me(user);
   }
 
   /** GET /api/auth — Lista los usuarios activos (solo ADMIN). */

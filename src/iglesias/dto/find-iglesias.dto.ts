@@ -10,7 +10,7 @@ import { ToBoolean } from '../../common/transforms/to-boolean.transform.js';
  */
 export class FindIglesiasDto extends PaginationDto {
 
-    /** Distrito exacto, sin distinguir mayúsculas ni tildes ("araucania" = "Araucanía"). */
+    /** Distrito exacto: el id del selector ("araucania") o el nombre, sin distinguir mayúsculas ni tildes. */
     @IsString()
     @IsOptional()
     distrito?: string;

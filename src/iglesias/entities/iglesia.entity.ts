@@ -1,6 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
 import { camposFaltantes, estadoFicha } from '../../common/utils/pendientes.utils.js';
+import { buscarDistrito } from '../distritos.js';
 
 /**
  * Los 5 datos de una ficha completa: dirección, horario, pastor, correo y teléfono.
@@ -20,7 +21,10 @@ export const CAMPOS_FICHA_IGLESIA = ['direccion', 'reuniones', 'encargado', 'ema
 @Schema({ timestamps: { createdAt: 'created_at', updatedAt: 'update_at' }, id: false })
 export class Iglesia extends Document {
 
-    /** Distrito al que pertenece (ej. "Araucanía"). index: se filtra mucho por este campo. */
+    /**
+     * Nombre del distrito, de la lista fija de distritos.ts (ej. "Araucanía"). El DTO también
+     * acepta el id ("araucania") y lo convierte al nombre. index: se filtra mucho por este campo.
+     */
     @Prop({ required: [true, "The distrito is required"], type: String, trim: true, index: true })
     distrito: string;
 
@@ -81,6 +85,9 @@ export class Iglesia extends Document {
      * Ej: { completos: 0, total: 5, porcentaje: 0, completa: false, estado: "Faltan 5" }
      */
     ficha: ReturnType<typeof estadoFicha>;
+
+    /** Campo calculado (no se guarda): el id del distrito ("araucania"), para preseleccionar el selector al editar. */
+    distrito_id: string | null;
 }
 
 /** Esquema de Mongoose generado a partir de la clase (lo registra IglesiasModule). */
@@ -97,6 +104,11 @@ IglesiaSchema.index(
 // Calcula "pendientes" a partir de lo guardado, cada vez que se lee (no ocupa espacio en Mongo)
 IglesiaSchema.virtual('pendientes').get(function (this: Iglesia) {
     return camposFaltantes(this, CAMPOS_FICHA_IGLESIA);
+});
+
+// El id del distrito ("araucania"); null si el distrito no está en la lista (dato antiguo)
+IglesiaSchema.virtual('distrito_id').get(function (this: Iglesia) {
+    return buscarDistrito(this.distrito)?.id ?? null;
 });
 
 // "0/5 · Faltan 5": cuántos de los datos de la ficha están llenos

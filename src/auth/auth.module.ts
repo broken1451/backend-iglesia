@@ -8,6 +8,7 @@ import { AuthController } from './auth.controller.js';
 import { Auth, AuthShema } from './entities/auth.entity.js';
 import { JwtAuth } from './providers/jwt-auth.provider.js';
 import { RolesPolicy } from './policies/roles.policy.js';
+import { IglesiasModule } from '../iglesias/iglesias.module.js';
 import './auth.types.js';
 
 /**
@@ -21,6 +22,9 @@ import './auth.types.js';
   // JwtAuth: convierte el token en usuario. RolesPolicy: la regla que usa @Roles(...)
   providers: [AuthService, JwtAuth, RolesPolicy],
   imports: [
+    // Para validar la iglesia asociada a un usuario con rol IGLESIA (IglesiasService)
+    IglesiasModule,
+
     // Modelo de usuarios; el nombre de la colección sale de config.yaml (mongo.collectionName)
     MongooseModule.forFeatureAsync([
       {

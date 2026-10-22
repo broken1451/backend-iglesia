@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsString, Matches, MaxLength, MinLength } from "class-validator";
+import { IsEmail, IsMongoId, IsNotEmpty, IsOptional, IsString, Matches, MaxLength, MinLength } from "class-validator";
 
 /**
  * Solo letras y espacios. \p{L} acepta cualquier letra de cualquier idioma
@@ -41,4 +41,14 @@ export class CreateAuthDto {
     @MinLength(6)
     @MaxLength(50)
     password: string;
+
+    /**
+     * Id de la iglesia del usuario (se elige de GET /api/iglesias). Opcional: si no viene,
+     * el usuario se crea sin iglesia y un ADMIN se la asigna después con PATCH /api/auth/:id.
+     * Mientras tanto no puede hacer login (ver AuthService.login).
+     * Si viene, debe existir y estar activa (lo revisa AuthService).
+     */
+    @IsOptional()
+    @IsMongoId({ message: 'iglesia must be the _id of an iglesia (from GET /api/iglesias)' })
+    iglesia?: string;
 }

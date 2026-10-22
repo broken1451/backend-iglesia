@@ -28,101 +28,10 @@ Content-Type: application/json
 }
 
 
-### Auth · Registrar usuario
-# Crea una cuenta con rol IGLESIA. No acepta roles. Guarda su _id en usuarioId.
-# @name registrarUsuario
-POST {{baseUrl}}/auth/register
-Content-Type: application/json
-
-{
-  "name": "José",
-  "last_name": "Muñoz",
-  "email": "jose.munoz@iglesia.cl",
-  "password": "secreto123"
-}
-
-
 ### Auth · Mi usuario (me)
 # Usuario dueño del token. Cualquier rol.
 GET {{baseUrl}}/auth/me
 Authorization: Bearer {{token}}
-
-
-### Auth · Listar usuarios
-# Solo ADMIN.
-GET {{baseUrl}}/auth
-Authorization: Bearer {{token}}
-
-
-### Auth · Ver usuario
-# Solo ADMIN.
-GET {{baseUrl}}/auth/{{usuarioId}}
-Authorization: Bearer {{token}}
-
-
-### Auth · Editar datos de usuario
-# Solo ADMIN. Solo cambia los campos enviados; nombre y correo se guardan en minúsculas. Un correo ya usado por otro usuario responde 400.
-PATCH {{baseUrl}}/auth/{{usuarioId}}
-Authorization: Bearer {{token}}
-Content-Type: application/json
-
-{
-  "name": "José Luis",
-  "email": "jose.luis@iglesia.cl"
-}
-
-
-### Auth · Asignar roles
-# Solo ADMIN. Reemplaza todos los roles.
-PATCH {{baseUrl}}/auth/{{usuarioId}}
-Authorization: Bearer {{token}}
-Content-Type: application/json
-
-{
-  "roles": [
-    "DISTRITO",
-    "COMUNICACIONES"
-  ]
-}
-
-
-### Auth · Cambiar contraseña
-# Solo ADMIN.
-PATCH {{baseUrl}}/auth/{{usuarioId}}
-Authorization: Bearer {{token}}
-Content-Type: application/json
-
-{
-  "password": "nueva-clave-123"
-}
-
-
-### Auth · Desactivar usuario
-# Solo ADMIN. Sus tokens dejan de servir al instante.
-DELETE {{baseUrl}}/auth/{{usuarioId}}
-Authorization: Bearer {{token}}
-
-
-### Auth · Reactivar usuario
-# Solo ADMIN.
-PATCH {{baseUrl}}/auth/{{usuarioId}}
-Authorization: Bearer {{token}}
-Content-Type: application/json
-
-{
-  "isActive": true
-}
-
-
-### Auth · Desbloquear usuario
-# Solo ADMIN. Desbloquea una cuenta bloqueada por 3 intentos fallidos (retry vuelve a 0).
-PATCH {{baseUrl}}/auth/{{usuarioId}}
-Authorization: Bearer {{token}}
-Content-Type: application/json
-
-{
-  "unblock": true
-}
 
 
 ######## IGLESIAS ########
@@ -133,7 +42,7 @@ GET {{baseUrl}}/iglesias?limit=20&offset=0
 
 
 ### Iglesias · Filtrar por distrito y nombre
-# distrito exacto y search "contiene", ambos sin tildes ni mayúsculas.
+# Público. distrito acepta el id ("araucania") o el nombre; search busca en el nombre o la comuna.
 GET {{baseUrl}}/iglesias?distrito=araucania&search=temuco
 
 
@@ -161,12 +70,12 @@ Authorization: Bearer {{token}}
 
 
 ### Iglesias · Distritos
-# Público. La lista fija de distritos, de norte a sur, con cuántas iglesias activas tiene cada uno. Llena el selector "Distrito" del formulario del panel y el filtro del sitio.
+# Público. La lista fija de distritos, de norte a sur: { id, nombre, zona, total } (total = iglesias activas). Llena el selector "Distrito" del formulario del panel (value = id) y el filtro del sitio.
 GET {{baseUrl}}/iglesias/distritos
 
 
 ### Iglesias · Crear iglesia
-# DISTRITO o ADMIN (hoy abierto, ver api.md). Los campos del formulario "Agregar iglesia": nombre, comuna, distrito (uno de la lista de GET /iglesias/distritos), dirección, horario, pastor, correo, teléfono y la ubicación del mapa (lat y lng van juntas). Con los 5 datos la ficha queda "Completa". Guarda el _id en iglesiaId.
+# DISTRITO o ADMIN (hoy abierto, ver api.md). Los campos del formulario "Agregar iglesia": nombre, comuna, distrito (el id del selector, ej. "araucania", o el nombre "Araucanía"; la lista sale de GET /iglesias/distritos), dirección, horario, pastor, correo, teléfono y la ubicación del mapa (lat y lng van juntas). Con los 5 datos la ficha queda "Completa". Guarda el _id en iglesiaId.
 # @name crearIglesia
 POST {{baseUrl}}/iglesias
 Authorization: Bearer {{token}}
@@ -175,7 +84,7 @@ Content-Type: application/json
 {
   "name": "Iglesia Bautista de Temuco",
   "comuna": "Temuco",
-  "distrito": "Araucanía",
+  "distrito": "araucania",
   "direccion": "Av. Alemania 0450, Temuco",
   "reuniones": "Domingo 11:00 · Miércoles 19:30",
   "encargado": "Pastor Juan Pérez",
@@ -239,6 +148,111 @@ Content-Type: application/json
 
 {
   "isActive": true
+}
+
+
+######## USUARIOS ########
+
+### Usuarios · Registrar usuario
+# Público. Crea una cuenta con rol IGLESIA, que siempre tiene una iglesia asociada: "iglesia" es el _id de una iglesia activa (aquí, la creada en Iglesias → Crear iglesia). Guarda el _id del usuario en usuarioId.
+# @name registrarUsuario
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "name": "José",
+  "last_name": "Muñoz",
+  "email": "jose.munoz@iglesia.cl",
+  "password": "secreto123",
+  "iglesia": "{{iglesiaId}}"
+}
+
+
+### Usuarios · Listar usuarios
+# Solo ADMIN.
+GET {{baseUrl}}/auth
+Authorization: Bearer {{token}}
+
+
+### Usuarios · Ver usuario
+# Solo ADMIN.
+GET {{baseUrl}}/auth/{{usuarioId}}
+Authorization: Bearer {{token}}
+
+
+### Usuarios · Editar datos de usuario
+# Solo ADMIN. Solo cambia los campos enviados; nombre y correo se guardan en minúsculas. Un correo ya usado por otro usuario responde 400.
+PATCH {{baseUrl}}/auth/{{usuarioId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "José Luis",
+  "email": "jose.luis@iglesia.cl"
+}
+
+
+### Usuarios · Asignar iglesia
+# Solo ADMIN. Asigna o cambia la iglesia del usuario (debe existir y estar activa). { "iglesia": null } la quita, solo si el usuario no tiene rol IGLESIA.
+PATCH {{baseUrl}}/auth/{{usuarioId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "iglesia": "{{iglesiaId}}"
+}
+
+
+### Usuarios · Asignar roles
+# Solo ADMIN. Reemplaza todos los roles. Si el usuario queda con IGLESIA, debe tener una iglesia (si no, 400).
+PATCH {{baseUrl}}/auth/{{usuarioId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "roles": [
+    "DISTRITO",
+    "COMUNICACIONES"
+  ]
+}
+
+
+### Usuarios · Cambiar contraseña
+# Solo ADMIN.
+PATCH {{baseUrl}}/auth/{{usuarioId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "password": "nueva-clave-123"
+}
+
+
+### Usuarios · Desactivar usuario
+# Solo ADMIN. Sus tokens dejan de servir al instante.
+DELETE {{baseUrl}}/auth/{{usuarioId}}
+Authorization: Bearer {{token}}
+
+
+### Usuarios · Reactivar usuario
+# Solo ADMIN.
+PATCH {{baseUrl}}/auth/{{usuarioId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "isActive": true
+}
+
+
+### Usuarios · Desbloquear usuario
+# Solo ADMIN. Desbloquea una cuenta bloqueada por 3 intentos fallidos (retry vuelve a 0).
+PATCH {{baseUrl}}/auth/{{usuarioId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "unblock": true
 }
 
 

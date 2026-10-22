@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "API Iglesia",
-    "description": "Todos los endpoints de la API Iglesia, en el orden en que conviene probarlos. 1) Ajusta baseUrl, email y password en Variables (un usuario ADMIN). 2) Ejecuta Auth → Login: el token se guarda solo y lo usan todos los requests (los públicos van sin token). 3) Los \"Crear ...\" guardan el _id (iglesiaId, actividadId, noticiaId) y \"Listar\" de Mensajes guarda mensajeId, para usarlos en Ver/Editar/Desactivar. También puedes correr la colección completa con el Runner. Documentación: docs/api.md",
+    "description": "Todos los endpoints de la API Iglesia, en el orden en que conviene probarlos. 1) Ajusta baseUrl, email y password en Variables (un usuario ADMIN). 2) Ejecuta Auth → Login: el token se guarda solo y lo usan todos los requests (los públicos van sin token). 3) Los \"Crear ...\" guardan el _id (iglesiaId, actividadId, noticiaId) y \"Listar\" de Mensajes guarda mensajeId, para usarlos en Ver/Editar/Desactivar. También puedes correr la colección completa con el Runner. Documentación: docs/api.md El registro de usuarios está en la carpeta Usuarios, después de Iglesias, porque cada usuario IGLESIA se registra con una iglesia.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -106,54 +106,6 @@
           }
         },
         {
-          "name": "Registrar usuario",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "const r = pm.response.json();",
-                  "const id = r.user?._id;",
-                  "if (id) pm.collectionVariables.set(\"usuarioId\", id);"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "auth": {
-              "type": "noauth"
-            },
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"José\",\n  \"last_name\": \"Muñoz\",\n  \"email\": \"jose.munoz@iglesia.cl\",\n  \"password\": \"secreto123\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{baseUrl}}/auth/register",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "auth",
-                "register"
-              ]
-            },
-            "description": "Crea una cuenta con rol IGLESIA. No acepta roles. Guarda su _id en usuarioId."
-          }
-        },
-        {
           "name": "Mi usuario (me)",
           "request": {
             "method": "GET",
@@ -170,220 +122,6 @@
             },
             "description": "Usuario dueño del token. Cualquier rol."
           }
-        },
-        {
-          "name": "Listar usuarios",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/auth",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "auth"
-              ]
-            },
-            "description": "Solo ADMIN."
-          }
-        },
-        {
-          "name": "Ver usuario",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/auth/{{usuarioId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "auth",
-                "{{usuarioId}}"
-              ]
-            },
-            "description": "Solo ADMIN."
-          }
-        },
-        {
-          "name": "Editar datos de usuario",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/auth/{{usuarioId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "auth",
-                "{{usuarioId}}"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"José Luis\",\n  \"email\": \"jose.luis@iglesia.cl\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "description": "Solo ADMIN. Solo cambia los campos enviados; nombre y correo se guardan en minúsculas. Un correo ya usado por otro usuario responde 400."
-          }
-        },
-        {
-          "name": "Asignar roles",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"roles\": [\n    \"DISTRITO\",\n    \"COMUNICACIONES\"\n  ]\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{baseUrl}}/auth/{{usuarioId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "auth",
-                "{{usuarioId}}"
-              ]
-            },
-            "description": "Solo ADMIN. Reemplaza todos los roles."
-          }
-        },
-        {
-          "name": "Cambiar contraseña",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"password\": \"nueva-clave-123\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{baseUrl}}/auth/{{usuarioId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "auth",
-                "{{usuarioId}}"
-              ]
-            },
-            "description": "Solo ADMIN."
-          }
-        },
-        {
-          "name": "Desactivar usuario",
-          "request": {
-            "method": "DELETE",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/auth/{{usuarioId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "auth",
-                "{{usuarioId}}"
-              ]
-            },
-            "description": "Solo ADMIN. Sus tokens dejan de servir al instante."
-          }
-        },
-        {
-          "name": "Reactivar usuario",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"isActive\": true\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{baseUrl}}/auth/{{usuarioId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "auth",
-                "{{usuarioId}}"
-              ]
-            },
-            "description": "Solo ADMIN."
-          }
-        },
-        {
-          "name": "Desbloquear usuario",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"unblock\": true\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{baseUrl}}/auth/{{usuarioId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "auth",
-                "{{usuarioId}}"
-              ]
-            },
-            "description": "Solo ADMIN. Desbloquea una cuenta bloqueada por 3 intentos fallidos (retry vuelve a 0)."
-          },
-          "response": []
         }
       ]
     },
@@ -448,7 +186,7 @@
                 }
               ]
             },
-            "description": "distrito exacto y search \"contiene\", ambos sin tildes ni mayúsculas."
+            "description": "Público. distrito acepta el id (\"araucania\") o el nombre; search busca en el nombre o la comuna."
           }
         },
         {
@@ -564,7 +302,7 @@
                 "distritos"
               ]
             },
-            "description": "Público. La lista fija de distritos, de norte a sur, con cuántas iglesias activas tiene cada uno. Llena el selector \"Distrito\" del formulario del panel y el filtro del sitio."
+            "description": "Público. La lista fija de distritos, de norte a sur: { id, nombre, zona, total } (total = iglesias activas). Llena el selector \"Distrito\" del formulario del panel (value = id) y el filtro del sitio."
           }
         },
         {
@@ -592,7 +330,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Iglesia Bautista de Temuco\",\n  \"comuna\": \"Temuco\",\n  \"distrito\": \"Araucanía\",\n  \"direccion\": \"Av. Alemania 0450, Temuco\",\n  \"reuniones\": \"Domingo 11:00 · Miércoles 19:30\",\n  \"encargado\": \"Pastor Juan Pérez\",\n  \"email\": \"contacto@iglesiatemuco.cl\",\n  \"telefono\": \"+56 45 221 3344\",\n  \"lat\": -38.7359,\n  \"lng\": -72.5904\n}",
+              "raw": "{\n  \"name\": \"Iglesia Bautista de Temuco\",\n  \"comuna\": \"Temuco\",\n  \"distrito\": \"araucania\",\n  \"direccion\": \"Av. Alemania 0450, Temuco\",\n  \"reuniones\": \"Domingo 11:00 · Miércoles 19:30\",\n  \"encargado\": \"Pastor Juan Pérez\",\n  \"email\": \"contacto@iglesiatemuco.cl\",\n  \"telefono\": \"+56 45 221 3344\",\n  \"lat\": -38.7359,\n  \"lng\": -72.5904\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -608,7 +346,7 @@
                 "iglesias"
               ]
             },
-            "description": "DISTRITO o ADMIN (hoy abierto, ver api.md). Los campos del formulario \"Agregar iglesia\": nombre, comuna, distrito (uno de la lista de GET /iglesias/distritos), dirección, horario, pastor, correo, teléfono y la ubicación del mapa (lat y lng van juntas). Con los 5 datos la ficha queda \"Completa\". Guarda el _id en iglesiaId."
+            "description": "DISTRITO o ADMIN (hoy abierto, ver api.md). Los campos del formulario \"Agregar iglesia\": nombre, comuna, distrito (el id del selector, ej. \"araucania\", o el nombre \"Araucanía\"; la lista sale de GET /iglesias/distritos), dirección, horario, pastor, correo, teléfono y la ubicación del mapa (lat y lng van juntas). Con los 5 datos la ficha queda \"Completa\". Guarda el _id en iglesiaId."
           }
         },
         {
@@ -777,6 +515,305 @@
             },
             "description": "DISTRITO o ADMIN."
           }
+        }
+      ]
+    },
+    {
+      "name": "Usuarios",
+      "item": [
+        {
+          "name": "Registrar usuario",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const r = pm.response.json();",
+                  "const id = r.user?._id;",
+                  "if (id) pm.collectionVariables.set(\"usuarioId\", id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"José\",\n  \"last_name\": \"Muñoz\",\n  \"email\": \"jose.munoz@iglesia.cl\",\n  \"password\": \"secreto123\",\n  \"iglesia\": \"{{iglesiaId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "description": "Público. Crea una cuenta con rol IGLESIA, que siempre tiene una iglesia asociada: \"iglesia\" es el _id de una iglesia activa (aquí, la creada en Iglesias → Crear iglesia). Guarda el _id del usuario en usuarioId."
+          }
+        },
+        {
+          "name": "Listar usuarios",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth"
+              ]
+            },
+            "description": "Solo ADMIN."
+          }
+        },
+        {
+          "name": "Ver usuario",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/{{usuarioId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "{{usuarioId}}"
+              ]
+            },
+            "description": "Solo ADMIN."
+          }
+        },
+        {
+          "name": "Editar datos de usuario",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/{{usuarioId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "{{usuarioId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"José Luis\",\n  \"email\": \"jose.luis@iglesia.cl\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Solo ADMIN. Solo cambia los campos enviados; nombre y correo se guardan en minúsculas. Un correo ya usado por otro usuario responde 400."
+          }
+        },
+        {
+          "name": "Asignar iglesia",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"iglesia\": \"{{iglesiaId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/{{usuarioId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "{{usuarioId}}"
+              ]
+            },
+            "description": "Solo ADMIN. Asigna o cambia la iglesia del usuario (debe existir y estar activa). { \"iglesia\": null } la quita, solo si el usuario no tiene rol IGLESIA."
+          }
+        },
+        {
+          "name": "Asignar roles",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"roles\": [\n    \"DISTRITO\",\n    \"COMUNICACIONES\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/{{usuarioId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "{{usuarioId}}"
+              ]
+            },
+            "description": "Solo ADMIN. Reemplaza todos los roles. Si el usuario queda con IGLESIA, debe tener una iglesia (si no, 400)."
+          }
+        },
+        {
+          "name": "Cambiar contraseña",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"password\": \"nueva-clave-123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/{{usuarioId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "{{usuarioId}}"
+              ]
+            },
+            "description": "Solo ADMIN."
+          }
+        },
+        {
+          "name": "Desactivar usuario",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/{{usuarioId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "{{usuarioId}}"
+              ]
+            },
+            "description": "Solo ADMIN. Sus tokens dejan de servir al instante."
+          }
+        },
+        {
+          "name": "Reactivar usuario",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isActive\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/{{usuarioId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "{{usuarioId}}"
+              ]
+            },
+            "description": "Solo ADMIN."
+          }
+        },
+        {
+          "name": "Desbloquear usuario",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"unblock\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/{{usuarioId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "{{usuarioId}}"
+              ]
+            },
+            "description": "Solo ADMIN. Desbloquea una cuenta bloqueada por 3 intentos fallidos (retry vuelve a 0)."
+          },
+          "response": []
         }
       ]
     },

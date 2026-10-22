@@ -1,6 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Document, Types } from 'mongoose';
 import { ValidRoles } from '../interfaces/role.enum.js';
+import { Iglesia } from '../../iglesias/entities/iglesia.entity.js';
 
 /**
  * Usuario del panel, tal como se guarda en Mongo (colección mongo.collectionName
@@ -50,6 +51,14 @@ export class Auth extends Document {
     /** Fecha del último login correcto. */
     @Prop({ type: Date, default: Date.now })
     update_at_login: Date;
+
+    /**
+     * La iglesia del usuario. **Obligatoria si tiene el rol IGLESIA**: sin ella no puede hacer
+     * login (AuthService lo exige al registrarse, al editarlo y al iniciar sesión).
+     * Para los demás roles es opcional. ref permite traer sus datos con populate.
+     */
+    @Prop({ type: Types.ObjectId, ref: Iglesia.name, default: null })
+    iglesia: Types.ObjectId | null;
 
     /** false = desactivado: no puede hacer login y sus tokens dejan de servir. */
     @Prop({ type: Boolean, default: true })

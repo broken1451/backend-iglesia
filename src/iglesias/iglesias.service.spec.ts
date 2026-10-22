@@ -168,33 +168,36 @@ describe('IglesiasService', () => {
   });
 
   describe('distritos (lista fija)', () => {
-    it('devuelve todos los de la lista, de norte a sur, con 0 los que no tienen iglesias', async () => {
+    it('devuelve todos los de la lista, de norte a sur, con la forma del front', async () => {
       model.aggregate.mockResolvedValue([
         { distrito: 'Araucanía', total: 14 },
         { distrito: 'Norte', total: 2 },
       ]);
-      expect(await service.distritos()).toEqual([
-        { distrito: 'Norte', total: 2 },
-        { distrito: 'Metropolitano', total: 0 },
-        { distrito: 'Valle Central', total: 0 },
-        { distrito: 'Biobío', total: 0 },
-        { distrito: 'Araucanía', total: 14 },
-        { distrito: 'Los Ríos', total: 0 },
-      ]);
+      const distritos = await service.distritos();
+      expect(distritos.map((fila) => fila.id)).toEqual(['norte', 'metropolitano', 'valle-central', 'biobio', 'araucania', 'los-rios']);
+      expect(distritos[0]).toEqual({ id: 'norte', nombre: 'Norte', zona: 'Antofagasta y La Serena', total: 2 });
+      expect(distritos[1]).toMatchObject({ id: 'metropolitano', total: 0 });
+      expect(distritos[4]).toMatchObject({ id: 'araucania', nombre: 'Araucanía', total: 14 });
     });
 
-    it('un distrito antiguo que no está en la lista va al final', async () => {
+    it('un distrito antiguo que no está en la lista va al final, sin id ni zona', async () => {
       model.aggregate.mockResolvedValue([{ distrito: 'Austral', total: 1 }]);
       const distritos = await service.distritos();
-      expect(distritos.at(-1)).toEqual({ distrito: 'Austral', total: 1 });
+      expect(distritos.at(-1)).toEqual({ id: null, nombre: 'Austral', zona: null, total: 1 });
       expect(distritos).toHaveLength(7);
     });
 
-    it('el avance por distrito sigue el mismo orden', async () => {
+    it('el avance por distrito sigue el mismo orden y forma', async () => {
       model.aggregate.mockResolvedValue([{ distrito: 'Los Ríos', iglesias: 6, completas: 0, porcentaje: 0 }]);
       const avance = await service.avancePorDistrito();
-      expect(avance.map((fila) => fila.distrito)).toEqual(['Norte', 'Metropolitano', 'Valle Central', 'Biobío', 'Araucanía', 'Los Ríos']);
-      expect(avance[0]).toEqual({ distrito: 'Norte', iglesias: 0, completas: 0, porcentaje: 0 });
+      expect(avance.map((fila) => fila.nombre)).toEqual(['Norte', 'Metropolitano', 'Valle Central', 'Biobío', 'Araucanía', 'Los Ríos']);
+      expect(avance[0]).toEqual({ id: 'norte', nombre: 'Norte', zona: 'Antofagasta y La Serena', iglesias: 0, completas: 0, porcentaje: 0 });
+      expect(avance[5]).toMatchObject({ id: 'los-rios', iglesias: 6 });
+    });
+
+    it('?distrito= acepta el id del selector', async () => {
+      await service.findAll({ distrito: 'los-rios' });
+      expect(model.find.mock.calls[0][0].distrito.test('Los Ríos')).toBe(true);
     });
   });
 });

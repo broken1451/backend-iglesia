@@ -23,12 +23,13 @@ Con la API corriendo (`yarn start:dev`), hay tres formas de probarla sin escribi
 2. Abre la colección → pestaña **Variables** → revisa `baseUrl` (`http://localhost:3500/api`) y pon tu correo y contraseña en `email` y `password`.
 3. Ejecuta **Auth → Login**. El token queda guardado solo en la variable `token` y lo usan todos los demás requests.
 4. Al crear una iglesia, actividad o noticia, su `_id` también se guarda (`iglesiaId`, `actividadId`, `noticiaId`), y "Mensajes → Listar todos" guarda el del primer mensaje (`mensajeId`), así que "Ver", "Editar" y "Desactivar" funcionan sin copiar ids.
-5. Para probar todo de una vez: clic derecho en la colección → **Run collection**. Los 64 requests están en el orden en que se pueden correr seguidos (con un usuario ADMIN en `email` / `password`).
+5. Para probar todo de una vez: clic derecho en la colección → **Run collection**. Los 65 requests están en el orden en que se pueden correr seguidos (con un usuario ADMIN en `email` / `password`).
 
 | Carpeta | Qué trae |
 |---|---|
-| Auth (11) | Login, registro, mi usuario, y la gestión de usuarios del ADMIN (roles, clave, desactivar, desbloquear) |
+| Auth (2) | Login y mi usuario |
 | Iglesias (14) | Listados del sitio y del panel (desactivadas, fichas incompletas y completas), búsqueda por comuna, distritos, crear, editar, completar ficha |
+| Usuarios (10) | Registro (con la iglesia creada antes) y la gestión del ADMIN: datos, iglesia, roles, clave, desactivar, desbloquear |
 | Actividades (13) | Próximas, nacionales, rango de fechas, por completar, crear, editar, inscritos, desactivar |
 | Noticias (13) | Listado, categoría, búsqueda, borradores, desactivadas, sin imagen, crear, publicar, editar |
 | Mensajes (10) | Formulario del sitio (sin token), listar, buscar, ver, marcar leído / no leído, archivar, recuperar |
@@ -60,6 +61,7 @@ curl http://localhost:3500/api
 Debe responder `Hello World!`.
 
 ### 2. Crear tu cuenta
+La iglesia es opcional en el registro (`"iglesia": "<_id>"` la asocia). Para la cuenta que vas a convertir en ADMIN no hace falta:
 
 ```bash
 curl -X POST http://localhost:3500/api/auth/register -H "Content-Type: application/json" -d '{"name":"Ana","last_name":"Rojas","email":"ana@iglesia.cl","password":"una-clave-segura"}'
@@ -130,7 +132,7 @@ GET /api/auth/me     Authorization: Bearer <token>
 | Respuesta | Qué hacer en el panel |
 |---|---|
 | `401` en el login | "Correo o contraseña incorrectos" (la API no distingue cuál de los dos, a propósito) |
-| `403` en el login | Mostrar el mensaje: la cuenta está bloqueada y debe pedirle a un ADMIN que la desbloquee |
+| `403` en el login | Mostrar el mensaje: la cuenta está bloqueada, o es un usuario IGLESIA sin iglesia asignada. En ambos casos debe pedirle a un ADMIN que lo resuelva |
 | `401` | Borrar el token y mandar al login (venció, o el usuario fue desactivado) |
 | `403` | Mostrar "No tienes permiso para esta acción" |
 | `400` con `message` lista | Mostrar cada mensaje junto a su campo del formulario |
@@ -174,7 +176,7 @@ Los mismos `GET` del sitio, con token, aceptan:
 | Por hacer (y el número del recuadro) | `porHacer.items`, `porHacer.total` |
 | Accesos rápidos | `accesosRapidos` (`titulo`, `icono`, `ruta`) |
 | Actividad reciente | `actividadReciente` (`fecha`, `texto`) |
-| Avance de fichas por distrito | `avanceDistritos.detalle` y `.distritos` (`distrito`, `iglesias`, `porcentaje`) |
+| Avance de fichas por distrito | `avanceDistritos.detalle` y `.distritos` (`nombre`, `zona`, `iglesias`, `porcentaje`) |
 
 Un bloque en `null` significa que el rol no ve esa sección: no se dibuja. Para refrescar solo el "Por hacer" (por ejemplo, al volver de completar una ficha): `GET /api/resumen/por-hacer`.
 
@@ -191,7 +193,8 @@ Un bloque en `null` significa que el rol no ve esa sección: no se dibuja. Para 
 Además, cada iglesia, actividad y noticia trae `pendientes` (ej. `["encargado", "telefono"]`), para marcar en la tabla del panel qué le falta a cada fila.
 
 ### Formulario "Agregar iglesia"
-- El selector **Distrito** se llena con `GET /api/iglesias/distritos` (campo `distrito`, ya en orden de norte a sur).
+- El selector **Distrito** se llena con `GET /api/iglesias/distritos`: cada opción con `value` = `id` (`"araucania"`) y texto = `nombre` (y `zona` como ayuda), ya en orden de norte a sur. Es la misma forma `{ id, nombre, zona }` que la lista `DISTRITOS` del front, así que el front puede dejar de tenerla escrita y pedirla aquí.
+- Al editar, la iglesia trae `distrito_id` para preseleccionar el selector.
 - "Guardar" envía `POST /api/iglesias` con `name`, `comuna`, `distrito`, `direccion`, `reuniones`, `encargado`, `email`, `telefono`, y `lat` / `lng` del punto del mapa (las dos o ninguna). Al editar, `PATCH /api/iglesias/:id` solo con lo que cambió.
 - Los errores llegan como `400` con la lista de mensajes; cada uno empieza con el nombre del campo (`"telefono must be..."`), para mostrarlo bajo el campo correcto. [Detalle](api.md#post-iglesias).
 
@@ -501,10 +504,11 @@ function enlaceGoogleCalendar(a) {
 | Cambiar los accesos rápidos del Resumen | `ACCESOS_RAPIDOS` en `src/auth/menu/menu.config.ts` |
 | Cambiar qué datos cuentan como "ficha completa" | `CAMPOS_FICHA_*` en la entidad (`iglesia.entity.ts`, `actividad.entity.ts`, `noticia.entity.ts`) |
 | Darle permiso de edición de una sección a otro rol | Agregar el rol en `editan` de `menu.config.ts`: cambia los `@Roles` de POST/PATCH **y** el "Por hacer" |
+| Asignar o cambiar la iglesia de un usuario | `PATCH /api/auth/:id` con `{ "iglesia": "<_id>" }` |
 | Desbloquear una cuenta (3 intentos fallidos) | `PATCH /api/auth/:id` con `{ "unblock": true }` |
 | Cambiar la contraseña de alguien | `PATCH /api/auth/:id` con `{ "password": "nueva-clave" }` |
 | Agregar una categoría de noticias | Sumarla en `src/noticias/interfaces/categoria.enum.ts` (y su ícono en el front) |
-| Agregar un distrito | Sumarlo en `src/iglesias/distritos.ts`, en su lugar (de norte a sur) |
+| Agregar un distrito | Sumarlo en `src/iglesias/distritos.ts` con su `id`, `nombre` y `zona`, en su lugar (de norte a sur). Si el front tiene la lista escrita, también allá |
 | Darle una sección del menú a otro rol | Agregar el rol en `src/auth/menu/menu.config.ts`: cambia el menú **y** los permisos de la API |
 | Ver un correo sin enviarlo | `email.transport: "file"` en `config.yaml`, y abrir el `.eml` de `mails/` |
 | Enviar correos de verdad | `transport: "smtp"` + `MAIL_USER` / `MAIL_PASSWORD` en `.env` ([correo.md](correo.md#enviar-de-verdad-smtp)) |
@@ -528,6 +532,8 @@ function enlaceGoogleCalendar(a) {
 | La hora sale 3 horas corrida | La fecha se mostró en UTC, o se envió sin zona | Enviar con `-03:00` y mostrar con `timeZone: 'America/Santiago'` |
 | La búsqueda no encuentra algo | El filtro `distrito` es exacto | Para "contiene", usar `search` (busca en el nombre) |
 | Un visitante no ve una noticia | Es un borrador, o está desactivada | Publicarla (`PATCH` `{ "publicado": true }`) |
+| `403` "Users with the IGLESIA role need an active iglesia" en el login | Usuario IGLESIA sin iglesia, o su iglesia fue desactivada | Un ADMIN: `PATCH /api/auth/:id` con `{ "iglesia": "<_id>" }` |
+| `400` "iglesia must be the _id of an iglesia" al registrarse | Falta elegir la iglesia | Mandar `iglesia` con el `_id` de una iglesia de `GET /api/iglesias` |
 | `403` "The user is blocked..." en el login | 3 contraseñas incorrectas seguidas | Un ADMIN: `PATCH /api/auth/:id` con `{ "unblock": true }` |
 | `401` "Invalid credentials" con la clave correcta | El usuario fue desactivado | Un ADMIN lo reactiva: `PATCH /api/auth/:id` `{ "isActive": true }` |
 | La app no arranca: "JWT_SECRET must be defined" | Falta el secreto o es corto | Ponerlo en `.env` con 32 caracteres o más |

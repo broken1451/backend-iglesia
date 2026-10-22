@@ -22,8 +22,8 @@ describe('ResumenService', () => {
   beforeEach(async () => {
     iglesias.contarIncompletas.mockResolvedValue(48);
     iglesias.avancePorDistrito.mockResolvedValue([
-      { distrito: 'Araucanía', iglesias: 14, completas: 0, porcentaje: 0 },
-      { distrito: 'Valle Central', iglesias: 5, completas: 1, porcentaje: 12 },
+      { id: 'valle-central', nombre: 'Valle Central', zona: 'Curicó, Talca, Linares y Ñuble', iglesias: 5, completas: 1, porcentaje: 12 },
+      { id: 'araucania', nombre: 'Araucanía', zona: 'Temuco, Malleco y Cautín', iglesias: 14, completas: 0, porcentaje: 0 },
     ]);
     actividades.contarIncompletas.mockResolvedValue(1);
     actividades.proximas.mockResolvedValue({ proximas: 6, inscritos: 105 });
@@ -60,8 +60,8 @@ describe('ResumenService', () => {
       expect(avanceDistritos).toEqual({
         detalle: 'Cada ficha completa tiene 5 datos: dirección, horario, pastor, correo y teléfono.',
         distritos: [
-          { distrito: 'Araucanía', iglesias: 14, porcentaje: 0 },
-          { distrito: 'Valle Central', iglesias: 5, porcentaje: 12 },
+          { id: 'valle-central', nombre: 'Valle Central', zona: 'Curicó, Talca, Linares y Ñuble', iglesias: 5, porcentaje: 12 },
+          { id: 'araucania', nombre: 'Araucanía', zona: 'Temuco, Malleco y Cautín', iglesias: 14, porcentaje: 0 },
         ],
       });
       expect(accesosRapidos.map((acceso) => acceso.titulo)).toEqual([

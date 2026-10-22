@@ -56,7 +56,7 @@ Todos los errores tienen la misma forma:
 | **401** | Sin token | `"Unauthorized"` (con `"errorCode": "missing_credentials"`) |
 | **401** | Token mal formado, vencido o de un usuario desactivado | `"malformed token"` / `"unknown subject"` |
 | **401** | Login: correo no registrado o contraseña incorrecta (misma respuesta) | `"Invalid credentials"` |
-| **403** | Login: cuenta bloqueada por intentos fallidos | `"The user is blocked after too many failed attempts; an ADMIN must unblock it"` |
+| **403** | Login: cuenta bloqueada por intentos fallidos, o usuario IGLESIA sin iglesia activa | `"The user is blocked after too many failed attempts; an ADMIN must unblock it"` |
 | **403** | Con token, pero el rol no tiene permiso | `"Forbidden"` |
 | **404** | No existe, o el visitante no puede verlo (desactivado o borrador) | `"Iglesia with id 6ad7... not found"` |
 
@@ -149,17 +149,30 @@ Usuarios del panel: registro, login y gestión.
 | `name`, `last_name` | texto | En minúsculas |
 | `email` | texto | En minúsculas, único |
 | `roles` | lista | `ADMIN`, `COMUNICACIONES`, `DISTRITO`, `IGLESIA` |
+| `iglesia` | objeto | `{ "_id", "name", "distrito", "comuna" }` de su iglesia, o `null`. **Necesaria para que un `IGLESIA` haga login** ([regla](#la-iglesia-del-usuario-rol-iglesia)) |
 | `isActive` | booleano | `false` = desactivado, no puede entrar |
 | `retry` | número | Intentos de login fallidos seguidos. Con 3, la cuenta se bloquea |
 | `update_at_login` | fecha | Último login correcto |
 
 La contraseña **nunca** viene en las respuestas.
 
+### La iglesia del usuario (rol IGLESIA)
+
+**Un usuario con el rol `IGLESIA` necesita una iglesia asociada para entrar al panel.** Se puede crear sin ella, pero no puede hacer login hasta que un ADMIN se la asigne:
+
+| Cuándo | Qué pasa |
+|---|---|
+| **Registro** (`POST /auth/register`) | `iglesia` es opcional. Si viene, debe ser el `_id` de una iglesia activa (elegida de `GET /iglesias`); si no, el usuario queda con `"iglesia": null` |
+| **Edición** (`PATCH /auth/:id`, ADMIN) | `{ "iglesia": "<_id>" }` la asigna (se revisa que exista y esté activa); `{ "iglesia": null }` la quita |
+| **Login** | Un usuario `IGLESIA` sin iglesia, o cuya iglesia fue desactivada, recibe `403` y no obtiene token, hasta que un ADMIN le asigne una |
+
+Los demás roles pueden tener una iglesia asociada, pero no la necesitan. Login, registro, `GET /auth/me` y la gestión de usuarios devuelven la iglesia con `{ "_id", "name", "distrito", "comuna" }`.
+
 ---
 
 ### `POST /auth/register`
 
-🌐 **Público** — Crea una cuenta. **Siempre con rol `IGLESIA`**; los demás roles los asigna un ADMIN. Deja la sesión iniciada (devuelve token).
+🌐 **Público** — Crea una cuenta. **Siempre con rol `IGLESIA`**, con o sin iglesia (sin ella no podrá hacer login hasta que un ADMIN se la asigne); los demás roles los asigna un ADMIN. Deja la sesión iniciada (devuelve token).
 
 **Body**
 
@@ -169,13 +182,14 @@ La contraseña **nunca** viene en las respuestas.
 | `last_name` | texto | ✅ | Solo letras y espacios |
 | `email` | texto | ✅ | Email válido. Único (sin distinguir mayúsculas) |
 | `password` | texto | ✅ | Entre 6 y 50 caracteres |
+| `iglesia` | texto | — | `_id` de una iglesia **activa**: el formulario de registro la deja elegir de `GET /iglesias`. Si no viene, queda `null` |
 
 **Ejemplo**
 
 ```bash
 curl -X POST http://localhost:3500/api/auth/register \
   -H "Content-Type: application/json" \
-  -d '{"name":"José","last_name":"Muñoz","email":"Jose.Munoz@Iglesia.cl","password":"secreto123"}'
+  -d '{"name":"José","last_name":"Muñoz","email":"Jose.Munoz@Iglesia.cl","password":"secreto123","iglesia":"6ad75c33e4515633ec65ee46"}'
 ```
 
 **Respuesta `201`**
@@ -187,6 +201,7 @@ curl -X POST http://localhost:3500/api/auth/register \
     "last_name": "muñoz",
     "email": "jose.munoz@iglesia.cl",
     "roles": ["IGLESIA"],
+    "iglesia": { "_id": "6ad75c33e4515633ec65ee46", "name": "Iglesia Bautista de Temuco", "distrito": "Araucanía", "comuna": "Temuco" },
     "isActive": true,
     "retry": 0,
     "_id": "6ad75c2ee4515633ec65ee41",
@@ -204,6 +219,16 @@ Nombre, apellido y correo se guardan en minúsculas. `expiresIn` está en segund
 📧 Además se envía el **correo de bienvenida** en segundo plano: la respuesta no lo espera, y si el envío falla el usuario queda registrado igual (el error queda en la consola). Ver [correo.md](correo.md).
 
 **Errores**
+
+Sin `iglesia`, o con una que no existe o está desactivada → `400`:
+
+```json
+{ "message": ["iglesia must be the _id of an iglesia (from GET /api/iglesias)"], "error": "Bad Request", "statusCode": 400 }
+```
+
+```json
+{ "message": "The iglesia 64b0000000000000000000ff does not exist or is not active", "error": "Bad Request", "statusCode": 400 }
+```
 
 Intentar darse roles → `400`:
 
@@ -264,6 +289,7 @@ curl -X POST http://localhost:3500/api/auth/login \
     "last_name": "prueba",
     "email": "admin@iglesia.cl",
     "roles": ["ADMIN"],
+    "iglesia": null,
     "isActive": true,
     "retry": 0,
     "created_at": "2026-10-20T12:18:54.879Z",
@@ -312,6 +338,12 @@ Cuenta bloqueada por 3 intentos fallidos, **con la contraseña correcta** → `4
 { "message": "The user is blocked after too many failed attempts; an ADMIN must unblock it", "error": "Forbidden", "statusCode": 403 }
 ```
 
+Usuario con rol `IGLESIA` sin iglesia asociada, o con su iglesia desactivada (con la contraseña correcta) → `403`. Un ADMIN se la asigna con [`PATCH /auth/:id`](#patch-authid) y `{ "iglesia": "<id>" }`:
+
+```json
+{ "message": "Users with the IGLESIA role need an active iglesia; an ADMIN must assign it (PATCH /api/auth/:id { \"iglesia\": \"<id>\" })", "error": "Forbidden", "statusCode": 403 }
+```
+
 Un login correcto vuelve `retry` a 0. Una cuenta bloqueada la desbloquea un ADMIN con [`PATCH /auth/:id`](#patch-authid) y `{ "unblock": true }`.
 
 ---
@@ -334,6 +366,7 @@ curl http://localhost:3500/api/auth/me \
   "last_name": "prueba",
   "email": "iglesia@iglesia.cl",
   "roles": ["IGLESIA"],
+  "iglesia": { "_id": "6ad75c33e4515633ec65ee46", "name": "Iglesia Bautista de Temuco", "distrito": "Araucanía", "comuna": "Temuco" },
   "isActive": true,
   "retry": 1,
   "created_at": "2026-10-20T12:18:56.911Z",
@@ -403,6 +436,7 @@ curl http://localhost:3500/api/auth/6ad75c2ee4515633ec65ee41 \
 | `password` | texto | 6 a 50 caracteres. Se guarda el nuevo hash |
 | `roles` | lista | **Reemplaza** todos los roles. Solo `ADMIN`, `COMUNICACIONES`, `DISTRITO`, `IGLESIA`, sin repetir |
 | `isActive` | booleano | `false` desactiva, `true` reactiva |
+| `iglesia` | texto o `null` | `_id` de una iglesia activa: la asigna o la cambia. `null` la quita, solo si el usuario no queda con rol `IGLESIA` |
 | `unblock` | booleano | `true` desbloquea una cuenta bloqueada por intentos fallidos (`retry` vuelve a 0). Asignar una `password` nueva también la desbloquea |
 
 **Ejemplo: asignar roles**
@@ -423,6 +457,7 @@ curl -X PATCH http://localhost:3500/api/auth/6ad75c2ee4515633ec65ee41 \
   "last_name": "muñoz",
   "email": "jose.munoz@iglesia.cl",
   "roles": ["DISTRITO", "COMUNICACIONES"],
+  "iglesia": { "_id": "6ad75c33e4515633ec65ee46", "name": "Iglesia Bautista de Temuco", "distrito": "Araucanía", "comuna": "Temuco" },
   "isActive": true,
   "retry": 0,
   "created_at": "2026-10-20T12:18:54.578Z",
@@ -437,6 +472,12 @@ El cambio aplica **en el siguiente request** del usuario: no necesita volver a h
 
 ```json
 { "isActive": true }
+```
+
+**Ejemplo: asignar la iglesia** (a un usuario IGLESIA que no puede entrar porque no tenía)
+
+```json
+{ "iglesia": "6ad75c33e4515633ec65ee46" }
 ```
 
 **Ejemplo: desbloquear** (después de 3 intentos fallidos)
@@ -486,7 +527,7 @@ Se reactiva con `PATCH /auth/:id` y `{ "isActive": true }`.
 | 🔴 Alta | **Recuperar contraseña** ("olvidé mi contraseña") con un enlace por correo | Hoy solo un ADMIN puede cambiarla. El envío de correos ya está listo ([correo.md](correo.md)) |
 | 🟡 Media | **Proteger al último ADMIN**: que no pueda quitarse el rol ni desactivarse | Si lo hace, nadie más puede administrar y hay que arreglarlo en Mongo |
 | 🟡 Media | **Cambiar la propia contraseña** (`PATCH /auth/me` con la clave actual y la nueva) | Hoy el usuario depende de un ADMIN para cambiarla |
-| 🟡 Media | **Asociar el usuario a su iglesia o distrito** | Para que IGLESIA edite solo la suya y DISTRITO solo las de su distrito (hoy IGLESIA no edita nada) |
+| 🟡 Media | **Que IGLESIA edite su propia ficha** (y asociar DISTRITO a su distrito) | El usuario IGLESIA ya tiene su iglesia; falta la regla "solo la suya" en `PATCH /iglesias/:id`. Para DISTRITO, falta asociarlo a su distrito (hoy IGLESIA no edita nada) |
 | 🟢 Baja | Contraseña mínima de **8** caracteres (hoy 6) | Recomendación actual de seguridad |
 | 🟢 Baja | **Paginar y filtrar** `GET /auth` (`?search`, `?roles`, `?isActive=false`) | Hoy devuelve todos los usuarios activos de una vez, y los desactivados solo se ven por id |
 | 🟢 Baja | **Avisar por correo** cuando un ADMIN cambia los roles de alguien | Ejemplo ya escrito en [correo.md](correo.md#agregar-un-correo-nuevo) |
@@ -501,7 +542,8 @@ Directorio de iglesias del sitio.
 
 | Campo | Tipo | Descripción |
 |---|---|---|
-| `distrito` | texto | Uno de la [lista fija](#get-iglesiasdistritos): `Norte`, `Metropolitano`, `Valle Central`, `Biobío`, `Araucanía`, `Los Ríos` |
+| `distrito` | texto | Nombre del distrito, de la [lista fija](#get-iglesiasdistritos): `Norte`, `Metropolitano`, `Valle Central`, `Biobío`, `Araucanía`, `Los Ríos` |
+| `distrito_id` | texto | Calculado: el `id` del distrito (`"araucania"`), para preseleccionar el selector al editar. `null` si el distrito no está en la lista (dato antiguo) |
 | `name` | texto | Nombre. Único dentro del distrito |
 | `direccion` | texto | Dirección postal |
 | `comuna` | texto | Comuna (ej. "Antofagasta"). La tabla del panel la muestra bajo el nombre |
@@ -537,7 +579,7 @@ Filtros útiles para la tabla: `?pendientes=true` (solo incompletas), `?pendient
 
 | Parámetro | Descripción |
 |---|---|
-| `distrito` | Distrito exacto, sin mayúsculas ni tildes |
+| `distrito` | Distrito exacto: el `id` (`araucania`) o el nombre, sin mayúsculas ni tildes |
 | `search` | Busca en el nombre o la comuna |
 | `isActive` | `false` lista las desactivadas. **Solo con token de ADMIN, DISTRITO o IGLESIA**; para el resto se ignora y siempre ven las activas |
 | `pendientes` | `true` lista solo las fichas incompletas (les falta dirección, horario, pastor, correo o teléfono); `false`, solo las completas. Solo panel, como `isActive` |
@@ -573,7 +615,8 @@ curl "http://localhost:3500/api/iglesias?distrito=araucania&search=temuco"
       "created_at": "2026-10-20T12:18:59.287Z",
       "update_at": "2026-10-20T12:18:59.287Z",
       "pendientes": [],
-      "ficha": { "completos": 5, "total": 5, "porcentaje": 100, "completa": true, "estado": "Completa" }
+      "ficha": { "completos": 5, "total": 5, "porcentaje": 100, "completa": true, "estado": "Completa" },
+      "distrito_id": "araucania"
     }
   ]
 }
@@ -622,10 +665,19 @@ El mismo request **sin token** devuelve las activas: un visitante no puede ver l
 ### `GET /iglesias/distritos`
 
 🌐 **Público** — **La lista fija de distritos**, de norte a sur, con cuántas iglesias activas tiene cada uno.
-- **Panel:** llena el selector "Distrito" del formulario "Agregar iglesia" (usar `distrito`).
-- **Sitio:** el filtro de distritos (puede ocultar los de `total: 0`).
+Cada distrito tiene **la misma forma que la lista del front**: `{ id, nombre, zona }`, más `total`.
 
-La lista vive en `src/iglesias/distritos.ts`; para agregar un distrito se suma ahí, en su lugar. Si en la base quedó alguna iglesia con un distrito que no está en la lista (cargada antes de que existiera), aparece al final.
+| Campo | Qué es | Uso |
+|---|---|---|
+| `id` | `"araucania"`: sin tildes ni espacios | El `value` del selector; es lo que se envía al crear o editar |
+| `nombre` | `"Araucanía"` | Lo que se muestra; es lo que queda guardado en la iglesia |
+| `zona` | `"Temuco, Malleco y Cautín"` | Texto de ayuda bajo el nombre |
+| `total` | Iglesias activas del distrito | El sitio puede ocultar los de `0` |
+
+- **Panel:** llena el selector "Distrito" del formulario "Agregar iglesia" (`value` = `id`, texto = `nombre`).
+- **Sitio:** el filtro de distritos: `GET /iglesias?distrito=<id>`.
+
+La lista vive en `src/iglesias/distritos.ts` (la misma del front: si se cambia en uno, hay que cambiarla en el otro, o que el front la pida aquí). Si en la base quedó alguna iglesia con un distrito que no está en la lista (cargada antes de que existiera), aparece al final con `id` y `zona` en `null`.
 
 ```bash
 curl http://localhost:3500/api/iglesias/distritos
@@ -635,12 +687,12 @@ curl http://localhost:3500/api/iglesias/distritos
 
 ```json
 [
-  { "distrito": "Norte", "total": 1 },
-  { "distrito": "Metropolitano", "total": 0 },
-  { "distrito": "Valle Central", "total": 0 },
-  { "distrito": "Biobío", "total": 0 },
-  { "distrito": "Araucanía", "total": 2 },
-  { "distrito": "Los Ríos", "total": 0 }
+  { "id": "norte", "nombre": "Norte", "zona": "Antofagasta y La Serena", "total": 1 },
+  { "id": "metropolitano", "nombre": "Metropolitano", "zona": "Santiago, San Antonio y Rancagua", "total": 0 },
+  { "id": "valle-central", "nombre": "Valle Central", "zona": "Curicó, Talca, Linares y Ñuble", "total": 1 },
+  { "id": "biobio", "nombre": "Biobío", "zona": "Concepción, Arauco y Los Ángeles", "total": 0 },
+  { "id": "araucania", "nombre": "Araucanía", "zona": "Temuco, Malleco y Cautín", "total": 1 },
+  { "id": "los-rios", "nombre": "Los Ríos", "zona": "Panguipulli, Lanco y Paillaco", "total": 0 }
 ]
 ```
 
@@ -682,7 +734,7 @@ No existe, o está desactivada y quien consulta es un visitante → `404`:
 
 | Campo | Tipo | Obligatorio | Reglas |
 |---|---|:-:|---|
-| `distrito` | texto | ✅ | **Uno de la lista fija**, escrito exacto (con tildes): `Norte`, `Metropolitano`, `Valle Central`, `Biobío`, `Araucanía`, `Los Ríos`. El panel la obtiene de [`GET /iglesias/distritos`](#get-iglesiasdistritos) |
+| `distrito` | texto | ✅ | **Uno de la lista fija**: el `id` del selector (`norte`, `metropolitano`, `valle-central`, `biobio`, `araucania`, `los-rios`) o el nombre (`Araucanía`, sin distinguir mayúsculas). Se guarda el nombre. El panel la obtiene de [`GET /iglesias/distritos`](#get-iglesiasdistritos) |
 | `name` | texto | ✅ | Máx. 150. **Único dentro del distrito** (sin distinguir mayúsculas ni espacios extra) |
 | `direccion` | texto | | Máx. 250 |
 | `comuna` | texto | | Máx. 100 |
@@ -739,7 +791,8 @@ curl -X POST http://localhost:3500/api/iglesias \
   "created_at": "2026-10-20T12:18:59.287Z",
   "update_at": "2026-10-20T12:18:59.287Z",
   "pendientes": [],
-  "ficha": { "completos": 5, "total": 5, "porcentaje": 100, "completa": true, "estado": "Completa" }
+  "ficha": { "completos": 5, "total": 5, "porcentaje": 100, "completa": true, "estado": "Completa" },
+  "distrito_id": "araucania"
 }
 ```
 
@@ -751,10 +804,10 @@ Body mínimo:
 
 **Errores**
 
-Distrito que no está en la lista (o mal escrito, como `"araucania"`) → `400`:
+Distrito que no está en la lista (ni como `id` ni como nombre, ej. `"atacama"`) → `400`:
 
 ```json
-{ "message": ["distrito must be one of: Norte, Metropolitano, Valle Central, Biobío, Araucanía, Los Ríos"], "error": "Bad Request", "statusCode": 400 }
+{ "message": ["distrito must be one of: norte, metropolitano, valle-central, biobio, araucania, los-rios"], "error": "Bad Request", "statusCode": 400 }
 ```
 
 Nombre repetido en el distrito. Este body choca con la de Temuco, aunque cambie mayúsculas y espacios: `{"distrito":"Araucanía","name":"  IGLESIA   BAUTISTA DE TEMUCO "}` → `400`:
@@ -1400,7 +1453,7 @@ La pantalla [Resumen](#get-resumen) ya entrega las 4 tarjetas, el "Por hacer" (f
 | 🟢 Baja | **Inscripciones reales** en vez de cargar `inscritos` a mano | La inscripción hoy es un formulario externo (`inscripcion_url`) que la API no ve |
 | 🟢 Baja | Eventos que no son cambios de datos en "Actividad reciente" ("Comunicaciones activó la transmisión en vivo") | Necesita la sección Configuración con su API |
 | 🟢 Baja | Mostrar el **rol o distrito** en "Actividad reciente" ("Distrito Araucanía actualizó...") | Hoy muestra el nombre de la persona; el distrito requiere asociarlo al usuario (ver Auth) |
-| 🟢 Baja | Que cada IGLESIA vea los pendientes de **su** iglesia | Requiere asociar el usuario a su iglesia (ver Auth) |
+| 🟢 Baja | Que cada IGLESIA vea los pendientes de **su** iglesia | El usuario ya tiene su iglesia; falta filtrar el Resumen por ella |
 | 🟢 Baja | Borrar el historial antiguo (índice TTL, ej. 1 año) | La colección `historial` crece con cada cambio |
 
 Cada tarea nueva del "Por hacer" se suma con un método en `ResumenService`, sin cambiar la forma de la respuesta.
@@ -1554,12 +1607,12 @@ curl http://localhost:3500/api/resumen \
   "avanceDistritos": {
     "detalle": "Cada ficha completa tiene 5 datos: dirección, horario, pastor, correo y teléfono.",
     "distritos": [
-      { "distrito": "Norte", "iglesias": 0, "porcentaje": 0 },
-      { "distrito": "Metropolitano", "iglesias": 0, "porcentaje": 0 },
-      { "distrito": "Valle Central", "iglesias": 2, "porcentaje": 80 },
-      { "distrito": "Biobío", "iglesias": 0, "porcentaje": 0 },
-      { "distrito": "Araucanía", "iglesias": 1, "porcentaje": 0 },
-      { "distrito": "Los Ríos", "iglesias": 0, "porcentaje": 0 }
+      { "id": "norte", "nombre": "Norte", "zona": "Antofagasta y La Serena", "iglesias": 0, "porcentaje": 0 },
+      { "id": "metropolitano", "nombre": "Metropolitano", "zona": "Santiago, San Antonio y Rancagua", "iglesias": 0, "porcentaje": 0 },
+      { "id": "valle-central", "nombre": "Valle Central", "zona": "Curicó, Talca, Linares y Ñuble", "iglesias": 2, "porcentaje": 80 },
+      { "id": "biobio", "nombre": "Biobío", "zona": "Concepción, Arauco y Los Ángeles", "iglesias": 0, "porcentaje": 0 },
+      { "id": "araucania", "nombre": "Araucanía", "zona": "Temuco, Malleco y Cautín", "iglesias": 1, "porcentaje": 0 },
+      { "id": "los-rios", "nombre": "Los Ríos", "zona": "Panguipulli, Lanco y Paillaco", "iglesias": 0, "porcentaje": 0 }
     ]
   }
 }
@@ -1576,7 +1629,7 @@ curl http://localhost:3500/api/resumen \
 | `porHacer` | Recuadro "Por hacer" | Igual que [`GET /resumen/por-hacer`](#get-resumenpor-hacer) | Según lo que puede editar |
 | `accesosRapidos` | "Publicar noticia", "Crear actividad"... | `ACCESOS_RAPIDOS` en `menu.config.ts`: con API, quien puede editar; sin API (proyectos, devocional), quien ve la sección | Según el rol |
 | `actividadReciente` | "20 oct · Distrito Araucanía actualizó la ficha de..." | Los 5 últimos cambios del historial, de las secciones que ve. `fecha` en UTC: mostrarla con `timeZone: 'America/Santiago'` | Según las secciones que ve |
-| `avanceDistritos` | "Avance de fichas por distrito" | Todos los distritos de la lista fija, **de norte a sur** (los sin iglesias, en 0). Por distrito: datos llenos / datos posibles. Ej. 5 iglesias × 5 datos = 25; con 3 llenos, **12%**. Así una ficha a medias también suma | Quien ve Iglesias |
+| `avanceDistritos` | "Avance de fichas por distrito" | Todos los distritos de la lista fija, **de norte a sur** (los sin iglesias, en 0), con `id`, `nombre` y `zona` como en `GET /iglesias/distritos`. Por distrito: datos llenos / datos posibles. Ej. 5 iglesias × 5 datos = 25; con 3 llenos, **12%**. Así una ficha a medias también suma | Quien ve Iglesias |
 
 `ruta` (en `porHacer` y `accesosRapidos`) es la `ruta` de la sección en el menú, con filtros (`?pendientes=true`) o `/nueva` para el formulario de crear.
 

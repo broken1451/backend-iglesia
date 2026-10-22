@@ -1,6 +1,7 @@
+import { Transform } from "class-transformer";
 import { IsEmail, IsIn, IsLatitude, IsLongitude, IsNotEmpty, IsOptional, IsString, Matches, MaxLength } from "class-validator";
 import { NormalizeSpaces } from "../../common/transforms/normalize-spaces.transform.js";
-import { DISTRITOS } from "../distritos.js";
+import { DISTRITOS, NOMBRES_DISTRITO, nombreDistrito } from "../distritos.js";
 
 /**
  * Body de POST /api/iglesias.
@@ -11,10 +12,11 @@ import { DISTRITOS } from "../distritos.js";
  */
 export class CreateIglesiaDto {
 
-    /** Distrito al que pertenece: uno de la lista fija (el selector del formulario). Obligatorio. */
-    @NormalizeSpaces()
+    // Se acepta el id del selector ("araucania") o el nombre ("Araucanía"); se guarda el nombre
+    /** Distrito al que pertenece: uno de la lista fija (src/iglesias/distritos.ts). Obligatorio. */
+    @Transform(({ value }) => (typeof value === 'string' ? nombreDistrito(value.replace(/\s+/g, ' ').trim()) : value))
     @IsString()
-    @IsIn(DISTRITOS, { message: `distrito must be one of: ${DISTRITOS.join(', ')}` })
+    @IsIn(NOMBRES_DISTRITO, { message: `distrito must be one of: ${DISTRITOS.map((distrito) => distrito.id).join(', ')}` })
     distrito: string;
 
     /** Nombre. Obligatorio y único dentro del distrito. */

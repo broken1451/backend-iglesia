@@ -1,12 +1,12 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, type QueryFilter } from 'mongoose';
+import { isValidObjectId, Model, type QueryFilter } from 'mongoose';
 import { CreateIglesiaDto } from './dto/create-iglesia.dto.js';
 import { UpdateIglesiaDto } from './dto/update-iglesia.dto.js';
 import { FindIglesiasDto } from './dto/find-iglesias.dto.js';
 import { CAMPOS_FICHA_IGLESIA, Iglesia } from './entities/iglesia.entity.js';
 import { faltaAlguno, tieneTodos } from '../common/utils/pendientes.utils.js';
-import { ordenarPorDistrito } from './distritos.js';
+import { conDatosDeDistrito, nombreDistrito } from './distritos.js';
 import { HistorialService, accionAlEditar } from '../historial/historial.service.js';
 import { AccionHistorial } from '../historial/entities/historial.entity.js';
 import type { Auth } from '../auth/entities/auth.entity.js';
@@ -58,7 +58,8 @@ export class IglesiasService {
   async findAll({ distrito, search, isActive, pendientes, limit = 20, offset = 0 }: FindIglesiasDto, verInactivas = false) {
     // Quien no gestiona iglesias solo ve las activas, pida lo que pida en ?isActive=
     const filter: QueryFilter<Iglesia> = { isActive: verInactivas ? (isActive ?? true) : true };
-    if (distrito) filter.distrito = equalsRegex(distrito);
+    // ?distrito= acepta el id del selector ("araucania") o el nombre, con o sin tildes
+    if (distrito) filter.distrito = equalsRegex(nombreDistrito(distrito));
     // Condiciones con $or / $and propios van en una lista $and, para que una no pise a la otra
     const condiciones: QueryFilter<Iglesia>[] = [];
     if (search) condiciones.push({ $or: [{ name: containsRegex(search) }, { comuna: containsRegex(search) }] });
@@ -82,7 +83,7 @@ export class IglesiasService {
    * - El filtro del sitio puede ocultar los de total 0.
    * Si en la base hay distritos fuera de la lista (datos antiguos), van al final.
    *
-   * @returns [{ distrito: "Norte", total: 2 }, { distrito: "Metropolitano", total: 0 }, ...]
+   * @returns [{ id: "norte", nombre: "Norte", zona: "Antofagasta y La Serena", total: 2 }, ...]
    *          en el orden de DISTRITOS (de norte a sur)
    */
   async distritos() {
@@ -91,9 +92,8 @@ export class IglesiasService {
       { $group: { _id: '$distrito', total: { $sum: 1 } } },          // una fila por distrito, contando
       { $project: { _id: 0, distrito: '$_id', total: 1 } },          // renombra _id → distrito
     ]);
-    // Todos los de la lista fija, en su orden (los sin iglesias, con total 0). El map deja
-    // las claves siempre en el mismo orden (Mongo pone primero "total")
-    return ordenarPorDistrito(filas, (distrito) => ({ distrito, total: 0 })).map(({ distrito, total }) => ({ distrito, total }));
+    // Todos los de la lista fija, en su orden y con la forma del front (los sin iglesias, en 0)
+    return conDatosDeDistrito(filas, { total: 0 });
   }
 
   /**
@@ -111,7 +111,7 @@ export class IglesiasService {
    * porcentaje = datos llenos / datos posibles. Ej: 5 iglesias × 5 datos = 25 posibles; con
    * 3 llenos, 12%. Así una ficha a medias también suma avance, no solo las completas.
    *
-   * @returns [{ distrito: "Araucanía", iglesias: 14, completas: 2, porcentaje: 31 }, ...]
+   * @returns [{ id: "araucania", nombre: "Araucanía", zona: "...", iglesias: 14, completas: 2, porcentaje: 31 }, ...]
    *          en el orden de DISTRITOS (los sin iglesias, en 0)
    */
   async avancePorDistrito() {
@@ -143,7 +143,16 @@ export class IglesiasService {
       },
     ]);
     // En el orden de la lista fija (de norte a sur), con los distritos sin iglesias en 0
-    return ordenarPorDistrito(filas, (distrito) => ({ distrito, iglesias: 0, completas: 0, porcentaje: 0 }));
+    return conDatosDeDistrito(filas, { iglesias: 0, completas: 0, porcentaje: 0 });
+  }
+
+  /**
+   * La iglesia activa con ese id, o null si no existe, está desactivada o el id no es válido.
+   * Lo usa AuthService para validar la iglesia de un usuario sin lanzar 404.
+   */
+  buscarActiva(id: string) {
+    if (!isValidObjectId(id)) return Promise.resolve(null);
+    return this.iglesiaModel.findOne({ _id: id, isActive: true });
   }
 
   /**

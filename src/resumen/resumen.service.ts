@@ -101,7 +101,7 @@ export class ResumenService {
       actividadReciente,
       avanceDistritos: distritos && {
         detalle: `Cada ficha completa tiene ${CAMPOS_FICHA_IGLESIA.length} datos: ${DATOS_FICHA.toLowerCase()}.`,
-        distritos: distritos.map(({ distrito, iglesias, porcentaje }) => ({ distrito, iglesias, porcentaje })),
+        distritos: distritos.map(({ id, nombre, zona, iglesias, porcentaje }) => ({ id, nombre, zona, iglesias, porcentaje })),
       },
     };
   }

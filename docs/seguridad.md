@@ -66,6 +66,12 @@ El login responde **el mismo `401 Invalid credentials`** si el correo no existe,
 - **Por qué:** si respondiera distinto ("ese correo no existe"), cualquiera podría averiguar quién tiene cuenta probando correos.
 - **También en el tiempo:** con un correo inexistente, `verify()` compara igual contra un hash falso, así la respuesta tarda lo mismo.
 
+### La iglesia del usuario IGLESIA
+Cada usuario con rol `IGLESIA` tiene una iglesia asociada (campo `iglesia` del usuario). Puede crearse sin ella (el registro la acepta opcional), pero el login la exige: sin iglesia activa responde `403` y no entrega token.
+- **Por qué en el login:** el panel de un usuario IGLESIA gira en torno a *su* iglesia; sin ella no habría qué mostrarle. Además, si un ADMIN desactiva una iglesia, sus usuarios dejan de poder entrar hasta que se les asigne otra.
+- Se revisa después de verificar la contraseña: a quien no sabe la clave no se le revela nada de la cuenta.
+- Los tokens ya entregados siguen sirviendo hasta que vencen (8 h); el próximo login aplica la regla.
+
 ### Bloqueo por intentos fallidos
 Cada contraseña incorrecta suma 1 a `retry` (con `$inc`, atómico: dos intentos simultáneos suman 2). Con 3 (`MAX_INTENTOS` en `auth.service.ts`) la cuenta queda bloqueada:
 - Con la contraseña **correcta**, el login responde `403` explicando que está bloqueada: es el dueño real y necesita saber qué pasa.
@@ -202,7 +208,7 @@ En el Resumen, cada bloque depende del rol: lo que no ve en el menú llega en `n
 
 `?isActive=false` y `?pendientes=true` en los listados solo tienen efecto para los roles que ven la sección en el menú; para el resto se ignoran.
 
-**Por qué IGLESIA no edita nada todavía:** no hay forma de saber cuál es *su* iglesia. Si pudiera editar, podría editar cualquiera. Cuando el usuario tenga asociado el id de su iglesia, se puede crear una regla "solo la suya".
+**Por qué IGLESIA no edita nada todavía:** cada usuario IGLESIA ya tiene su iglesia asociada, pero falta la regla "solo la suya" en `PATCH /iglesias/:id`. Sin ella, si pudiera editar, podría editar cualquiera. Cuando el usuario tenga asociado el id de su iglesia, se puede crear una regla "solo la suya".
 
 ## Problemas conocidos
 

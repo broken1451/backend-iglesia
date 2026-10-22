@@ -151,7 +151,7 @@ Mongo guarda las fechas en UTC y la API las devuelve así (`2026-10-31T22:00:00.
 El directorio que muestra el sitio.
 - **Campos** (los del formulario "Agregar iglesia"): `name`, `comuna`, `distrito`, `direccion`, `reuniones`, `encargado`, `email`, `telefono`, `lat`, `lng`. Además, calculados al responder: `pendientes` y `ficha`.
 - **Nombre único por distrito** (sin distinguir mayúsculas): puede haber una "Iglesia Central" en dos distritos distintos, pero no dos en el mismo.
-- **Distrito de una lista fija** (`iglesias/distritos.ts`): Norte, Metropolitano, Valle Central, Biobío, Araucanía, Los Ríos. Crear o editar con otro responde 400. **Por qué:** con texto libre, "Araucania" y "Araucanía" serían dos distritos distintos en el filtro y en el avance. La lista también define el orden (de norte a sur) de `GET /iglesias/distritos` y del avance por distrito; un distrito antiguo que no esté en la lista va al final.
+- **Distrito de una lista fija** (`iglesias/distritos.ts`), con la misma forma que la del front: `{ id: 'araucania', nombre: 'Araucanía', zona: 'Temuco, Malleco y Cautín' }`. Al crear o editar se acepta el `id` o el nombre (`nombreDistrito()` lo convierte), y **se guarda el nombre**: así los datos existentes siguen sirviendo y los listados se leen sin traducir. Uno que no esté en la lista responde 400. Cada iglesia expone además el virtual `distrito_id`. **Por qué:** con texto libre, "Araucania" y "Araucanía" serían dos distritos distintos en el filtro y en el avance. La lista también define el orden (de norte a sur) de `GET /iglesias/distritos` y del avance por distrito; un distrito antiguo que no esté en la lista va al final.
 - **Coordenadas en par:** `lat` y `lng` van juntas o ninguna. Un punto con una sola coordenada rompería el mapa. La regla se valida contra lo ya guardado, así un PATCH tampoco puede dejar media coordenada.
 - **`GET /iglesias/distritos`:** la lista fija con cuántas iglesias activas tiene cada distrito: llena el selector del formulario del panel y el filtro del sitio. Va declarado antes que `/:id` porque si no, Nest tomaría "distritos" como un id.
 
@@ -178,6 +178,11 @@ Noticias y comunicados del sitio.
 - **El autor sale del token**, nunca del body: nadie puede publicar a nombre de otro. En la respuesta solo va su nombre, no su correo.
 - **El listado no trae `contenido`** (el texto completo): las tarjetas solo usan `resumen`, y así la respuesta pesa mucho menos. El detalle (`/:id`) sí lo trae.
 - El panel lista las desactivadas con `?isActive=false`, igual que en iglesias y actividades.
+
+### La iglesia de cada usuario
+El usuario tiene un campo `iglesia` (referencia a una iglesia). **Con el rol IGLESIA es necesario para entrar**: el registro lo acepta opcional y el ADMIN lo asigna o quita al editar, pero `AuthService.login` responde 403 a un IGLESIA sin iglesia activa. Para validar que la iglesia exista y esté activa, `AuthModule` importa `IglesiasModule` y usa `IglesiasService.buscarActiva()`.
+
+Al devolver un usuario, su iglesia viene con `populate` y `lean`: solo `_id`, `name`, `distrito` y `comuna`, sin los campos calculados de la ficha (que con esos datos parciales saldrían mal).
 
 ### Mensajes
 El formulario de contacto del sitio (`POST /api/mensajes`, público). El panel los lista, los marca como leídos (`leido`) y los archiva. Lo que escribió el visitante no se edita: el `UpdateMensajeDto` solo acepta `leido` e `isActive`. El `POST` responde solo "Mensaje recibido", sin devolver el registro.
